@@ -18,11 +18,16 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+const UUID = "feeds@jonbrettdev.wordpress.com"
+
+imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
+
 const Lang = imports.lang;
 const Applet = imports.ui.applet;
 const GLib = imports.gi.GLib;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const _ = Gettext.gettext;
+const FeedReader = imports.feedreader;
 
 function FeedApplet(orientation) {
     this._init(orientation);
@@ -37,11 +42,13 @@ FeedApplet.prototype = {
         try {
             this.set_applet_icon_name("news-feed");
             this.set_applet_tooltip(_("Feed reader"));
-        }
-        catch (e) {
+        } catch (e) {
             global.logError(e);
         }
-     },
+        this.reader = new FeedReader.FeedReader('http://segfault.linuxmint.com/feed/');
+
+        this.reader.get();
+    },
 
     on_applet_clicked: function(event) {
         GLib.spawn_command_line_async('xdg-open https://jonbrettdev.wordpress.com');
