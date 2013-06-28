@@ -26,6 +26,7 @@ const Lang = imports.lang;
 const Applet = imports.ui.applet;
 const GLib = imports.gi.GLib;
 const Gettext = imports.gettext.domain('cinnamon-applets');
+const PopupMenu = imports.ui.popupMenu;
 const _ = Gettext.gettext;
 const FeedReader = imports.feedreader;
 
@@ -42,16 +43,40 @@ FeedApplet.prototype = {
         try {
             this.set_applet_icon_name("news-feed");
             this.set_applet_tooltip(_("Feed reader"));
+
+            this.menuManager = new PopupMenu.PopupMenuManager(this);
+            this.menu = new Applet.AppletPopupMenu(this, orientation);
+            this.menuManager.addMenu(this.menu);
+
+            this.reader = new FeedReader.FeedReader(
+                    'http://segfault.linuxmint.com/feed/',
+                    5,
+                    {
+                        'onUpdate' : Lang.bind(this, this.on_update)
+                    });
+
+            this.refresh();
+            this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
         } catch (e) {
             global.logError(e);
         }
-        this.reader = new FeedReader.FeedReader('http://segfault.linuxmint.com/feed/');
 
-        this.reader.get();
+    },
+
+    on_update: function() {
+        this.set_applet_tooltip(this.reader.title);
+        for (var i = 0; i < this.reader.items.length; i++) {
+            var item = new PopupMenu.PopupMenuItem(this.reader.items[i].title);
+            this.menu.addMenuItem(item);
+        }
+    },
+
+    refresh: function() {
+        this.reader.get()
     },
 
     on_applet_clicked: function(event) {
-        GLib.spawn_command_line_async('xdg-open https://jonbrettdev.wordpress.com');
+        this.menu.toggle();
     }
 };
 

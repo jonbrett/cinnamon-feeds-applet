@@ -22,22 +22,23 @@ const Lang = imports.lang;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const _ = Gettext.gettext;
 
-function FeedReader(url) {
-    this._init(url);
+function FeedReader(url, max_item, callbacks) {
+    this._init(url, max_item, callbacks);
 }
 
 FeedReader.prototype = {
 
-    _init: function(url) {
+    _init: function(url, max_item, callbacks) {
 
         this.url = url;
+        this.max_item = max_item;
+        this.callbacks = callbacks;
 
-        /* Get namespace */
-        try {
-            this.rssns = new Namespace('http://www.rssboard.org/rss-specification');
-        } catch (e) {
-            throw "Failed to create RSS namespace: " + e;
-        }
+        /* Feed data */
+        this.title = "";
+        this.description = "";
+        this.link = "";
+        this.items = new Array();
 
         /* Init HTTP session */
         try {
@@ -62,9 +63,39 @@ FeedReader.prototype = {
             return;
         }
 
-        var feed = message.response_body.data;
+        var feed = new XML(message.response_body.data.replace(
+                /^<\?xml\s+version\s*=\s*(["'])[^\1]+\1[^?]*\?>/, ""));
 
-        global.log(feed);
-    }
+        /* Process RSS to update channel data */
+        this.title = String(feed..channel.title);
+        this.description = String(feed..channel.description);
+        this.link = String(feed..channel.link);
+
+        var rss_item = feed..channel.item;
+        this.items = new Array();
+
+        for (var i = 0; i < Math.min(rss_item.length(), this.max_item); i++) {
+            var item = rss_item[i];
+
+            var new_item = {
+                'title': String(rss_item[i].title),
+                'link': String(rss_item[i].link),
+                'description': String(rss_item[i].description),
+                'id': String(rss_item[i].guid),
+                'read': false
+            };
+
+            /* guid is optional in RSS spec, so use link as identifier if it's
+             * not present */
+            if (new_item.id == '')
+                new_item.id = new_item.link;
+
+            this.items.push(new_item);
+        }
+
+        global.log('Read ' + this.items.length + '/' + rss_item.length() +
+                ' items from ' + this.url);
+
+        this.callbacks.onUpdate();
+    },
 };
-
