@@ -22,13 +22,33 @@ const UUID = "feeds@jonbrettdev.wordpress.com"
 
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
-const Lang = imports.lang;
 const Applet = imports.ui.applet;
+const FeedReader = imports.feedreader;
 const GLib = imports.gi.GLib;
 const Gettext = imports.gettext.domain('cinnamon-applets');
+const Lang = imports.lang;
 const PopupMenu = imports.ui.popupMenu;
+const St = imports.gi.St;
+const Util = imports.misc.util;
 const _ = Gettext.gettext;
-const FeedReader = imports.feedreader;
+
+/* Menu item for displaying an feed item */
+function FeedMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+FeedMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (label, url, read, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        this.url = url;
+        this.read = read;
+        this.addActor(new St.Label({ text: label }));
+    },
+};
+
 
 function FeedApplet(orientation) {
     this._init(orientation);
@@ -65,8 +85,22 @@ FeedApplet.prototype = {
 
     on_update: function() {
         this.set_applet_tooltip(this.reader.title);
+
+        this.menu.removeAll();
+
+        var item = new PopupMenu.PopupMenuItem(this.reader.title);
+        this.menu.addMenuItem(item);
+        item = new PopupMenu.PopupSeparatorMenuItem();
+        this.menu.addMenuItem(item);
+
         for (var i = 0; i < this.reader.items.length; i++) {
-            var item = new PopupMenu.PopupMenuItem(this.reader.items[i].title);
+            var item = new FeedMenuItem(
+                    this.reader.items[i].title,
+                    this.reader.items[i].link,
+                    this.reader.items[i].read);
+            item.connect("activate", function(actor, event) {
+                Util.spawnCommandLine('xdg-open ' + actor.url);
+            });
             this.menu.addMenuItem(item);
         }
     },
