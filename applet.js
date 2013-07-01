@@ -50,14 +50,14 @@ FeedMenuItem.prototype = {
 };
 
 
-function FeedApplet(orientation) {
-    this._init(orientation);
+function FeedApplet(metadata, orientation) {
+    this._init(metadata, orientation);
 }
 
 FeedApplet.prototype = {
     __proto__: Applet.IconApplet.prototype,
 
-    _init: function(orientation) {
+    _init: function(metadata, orientation) {
         Applet.IconApplet.prototype._init.call(this, orientation);
 
         try {
@@ -70,6 +70,7 @@ FeedApplet.prototype = {
 
             this.reader = new FeedReader.FeedReader(
                     'http://segfault.linuxmint.com/feed/',
+                    metadata.path + '/feeds',
                     5,
                     {
                         'onUpdate' : Lang.bind(this, this.on_update)
@@ -115,5 +116,5 @@ FeedApplet.prototype = {
 };
 
 function main(metadata, orientation) {
-    return new FeedApplet(orientation);
+    return new FeedApplet(metadata, orientation);
 }

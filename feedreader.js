@@ -17,20 +17,23 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-const Soup = imports.gi.Soup;
-const Lang = imports.lang;
+const Cinnamon = imports.gi.Cinnamon;
 const Gettext = imports.gettext.domain('cinnamon-applets');
+const Gio = imports.gi.Gio;
+const Lang = imports.lang;
+const Soup = imports.gi.Soup;
 const _ = Gettext.gettext;
 
-function FeedReader(url, max_item, callbacks) {
-    this._init(url, max_item, callbacks);
+function FeedReader(url, path, max_item, callbacks) {
+    this._init(url, path, max_item, callbacks);
 }
 
 FeedReader.prototype = {
 
-    _init: function(url, max_item, callbacks) {
+    _init: function(url, path, max_item, callbacks) {
 
         this.url = url;
+        this.path = path;
         this.max_item = max_item;
         this.callbacks = callbacks;
 
@@ -96,6 +99,61 @@ FeedReader.prototype = {
         global.log('Read ' + this.items.length + '/' + rss_item.length() +
                 ' items from ' + this.url);
 
+        this.save_items();
+        this.load_items();
+
         this.callbacks.onUpdate();
     },
+
+    save_items: function() {
+        try {
+            var dir = Gio.file_new_for_path(this.path);
+            if (!dir.query_exists(null)) {
+                dir.make_directory_with_parents(null);
+            }
+
+            /* Write feed items to a file as JSON.
+             * I found escaping the string helps to deal with special
+             * characters, which could cause problems when parsing the file
+             * later */
+            var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
+            var fs = file.replace(null, false,
+                    Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            fs.write(escape(JSON.stringify(this.items)), null);
+            fs.close(null);
+        } catch (e) {
+            global.logError('Failed to write feed file ' + e);
+        }
+    },
+
+    load_items: function() {
+        try {
+            var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
+            var fs = file.open_readwrite(null);
+        } catch (e) {
+            /* File doesn't exist yet. This is fine */
+            global.log("No feed backing file (this is fine for a new feed)");
+            return;
+        }
+
+        try {
+            var content = Cinnamon.get_file_contents_utf8_sync(
+                    this.path + '/' + sanitize_url(this.url));
+            var data = JSON.parse(unescape(content));
+
+            if (typeof data == "object") {
+                this.items = data;
+                global.log(data);
+            } else {
+                global.logError('Invalid data loaded for ' + this.url);
+            }
+        } catch (e) {
+            /* Invalid file contents */
+            global.logError('Failed to read feed data file for ' + this.url + ':' + e);
+        }
+    }
 };
+
+function sanitize_url(url) {
+    return url.replace(/.*:\/\//, '').replace(/\//g,'--');
+}
