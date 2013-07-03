@@ -126,7 +126,14 @@ FeedReader.prototype = {
             var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
             var fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-            fs.write(escape(JSON.stringify(this.items)), null);
+            var data = {
+                "title": this.title,
+                "link": this.link,
+                "description": this.description,
+                "items": this.items
+            };
+
+            fs.write(escape(JSON.stringify(data)), null);
             fs.close(null);
         } catch (e) {
             global.logError('Failed to write feed file ' + e);
@@ -149,7 +156,21 @@ FeedReader.prototype = {
             var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {
-                this.items = data;
+                if (data.title != undefined)
+                    this.title = data.title;
+                else
+                    this.title = _("Loading feed");
+
+                if (data.link != undefined)
+                    this.link = data.link;
+
+                if (data.description != undefined)
+                    this.description = data.description;
+
+                if (data.items != undefined)
+                    this.items = data.items
+                else
+                    this.items = new Array();
             } else {
                 global.logError('Invalid data loaded for ' + this.url);
             }
@@ -169,6 +190,7 @@ FeedReader.prototype = {
                 this.items.push(items[i]);
             }
         }
+        global.log('Retrieved ' + new_count + ' new items for ' + this.url);
         return new_count;
     },
 
