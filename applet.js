@@ -40,12 +40,20 @@ function FeedMenuItem() {
 FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (label, url, read, params) {
+    _init: function (label, url, read, id, reader, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
+        this.reader = reader;
         this.url = url;
         this.read = read;
+        this.id = id;
+        this.reader = reader;
         this.addActor(new St.Label({ text: label }));
+    },
+
+    read_item: function() {
+        this.reader.mark_item_read(this.id);
+        Util.spawnCommandLine('xdg-open ' + this.url);
     },
 };
 
@@ -76,17 +84,20 @@ FeedApplet.prototype = {
                         'onUpdate' : Lang.bind(this, this.on_update)
                     });
 
-            this.on_update();
+            this.build_menu();
 
             this.refresh();
             this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
         } catch (e) {
             global.logError(e);
         }
-
     },
 
     on_update: function() {
+        this.build_menu();
+    },
+
+    build_menu: function() {
         this.set_applet_tooltip(this.reader.title);
 
         this.menu.removeAll();
@@ -100,9 +111,11 @@ FeedApplet.prototype = {
             var item = new FeedMenuItem(
                     this.reader.items[i].title,
                     this.reader.items[i].link,
-                    this.reader.items[i].read);
+                    this.reader.items[i].read,
+                    this.reader.items[i].id,
+                    this.reader);
             item.connect("activate", function(actor, event) {
-                Util.spawnCommandLine('xdg-open ' + actor.url);
+                actor.read_item();
             });
             this.menu.addMenuItem(item);
         }
