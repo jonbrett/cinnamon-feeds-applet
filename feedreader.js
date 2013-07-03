@@ -51,6 +51,9 @@ FeedReader.prototype = {
         } catch (e) {
             throw "Failed to create HTTP session: " + e;
         }
+
+        /* Load items */
+        this.load_items();
     },
 
     get: function() {
@@ -75,11 +78,9 @@ FeedReader.prototype = {
         this.link = String(feed..channel.link);
 
         var rss_item = feed..channel.item;
-        this.items = new Array();
+        var new_items = new Array();
 
-        for (var i = 0; i < Math.min(rss_item.length(), this.max_item); i++) {
-            var item = rss_item[i];
-
+        for (var i = 0; i < rss_item.length(); i++) {
             var new_item = {
                 'title': String(rss_item[i].title),
                 'link': String(rss_item[i].link),
@@ -93,16 +94,22 @@ FeedReader.prototype = {
             if (new_item.id == '')
                 new_item.id = new_item.link;
 
-            this.items.push(new_item);
+            new_items.push(new_item);
         }
 
-        global.log('Read ' + this.items.length + '/' + rss_item.length() +
-                ' items from ' + this.url);
+        /* We are only interested in new items that we haven't seen before */
+        if (this._add_items(new_items) > 0) {
+            this.save_items();
+            this.callbacks.onUpdate();
+        }
+    },
 
-        this.save_items();
-        this.load_items();
-
-        this.callbacks.onUpdate();
+    mark_item_read: function(id) {
+        var item = this._get_item_by_id(id);
+        if (item != null) {
+            item.read = true;
+            this.save_items();
+        }
     },
 
     save_items: function() {
@@ -143,7 +150,6 @@ FeedReader.prototype = {
 
             if (typeof data == "object") {
                 this.items = data;
-                global.log(data);
             } else {
                 global.logError('Invalid data loaded for ' + this.url);
             }
@@ -151,7 +157,29 @@ FeedReader.prototype = {
             /* Invalid file contents */
             global.logError('Failed to read feed data file for ' + this.url + ':' + e);
         }
-    }
+
+        global.log('Loaded ' + this.items.length + ' items for ' + this.url);
+    },
+
+    _add_items: function(items) {
+        var new_count = 0;
+        for (var i = 0; i < items.length; i++) {
+            if (this._get_item_by_id(items[i].id) == null) {
+                new_count++;
+                this.items.push(items[i]);
+            }
+        }
+        return new_count;
+    },
+
+    _get_item_by_id: function(id) {
+        for (var i = 0; i < this.items.length; i++) {
+            if (this.items[i].id == id)
+                return this.items[i];
+        }
+        return null;
+    },
+
 };
 
 function sanitize_url(url) {

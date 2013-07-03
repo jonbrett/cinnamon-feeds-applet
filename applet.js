@@ -76,6 +76,8 @@ FeedApplet.prototype = {
                         'onUpdate' : Lang.bind(this, this.on_update)
                     });
 
+            this.on_update();
+
             this.refresh();
             this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
         } catch (e) {
