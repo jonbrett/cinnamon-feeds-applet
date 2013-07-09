@@ -29,6 +29,7 @@ const GLib = imports.gi.GLib;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const Lang = imports.lang;
 const PopupMenu = imports.ui.popupMenu;
+const Settings = imports.ui.settings;
 const St = imports.gi.St;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
@@ -102,6 +103,7 @@ FeedApplet.prototype = {
         Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
 
         try {
+            this.path = metadata.path;
             this.icon_path = metadata.path + '/icons/';
             this.set_applet_icon_path(this.icon_path + 'rss.svg');
             this.set_applet_tooltip(_("Feed reader"));
@@ -110,21 +112,37 @@ FeedApplet.prototype = {
             this.menu = new Applet.AppletPopupMenu(this, orientation);
             this.menuManager.addMenu(this.menu);
 
-            this.reader = new FeedReader.FeedReader(
-                    'http://segfault.linuxmint.com/feed/',
-                    metadata.path + '/feeds',
-                    5,
-                    {
-                        'onUpdate' : Lang.bind(this, this.on_update)
-                    });
-
-            this.build_menu();
-
-            this.refresh();
-            this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
         } catch (e) {
             global.logError(e);
         }
+
+        this.init_settings();
+
+        this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
+    },
+
+    init_settings: function(instance_id) {
+        this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                                 "url",
+                                 "url",
+                                 this.url_changed,
+                                 null);
+        this.url_changed();
+    },
+
+    url_changed: function() {
+        global.log('url changed to ' + this.url);
+        this.reader = new FeedReader.FeedReader(
+                this.url,
+                this.path + '/feeds',
+                5,
+                {
+                    'onUpdate' : Lang.bind(this, this.on_update)
+                });
+        this.build_menu();
+        this.refresh();
     },
 
     on_update: function() {
@@ -171,7 +189,8 @@ FeedApplet.prototype = {
     },
 
     refresh: function() {
-        this.reader.get()
+        if (this.reader != undefined)
+            this.reader.get()
     },
 
     on_applet_clicked: function(event) {
