@@ -70,7 +70,7 @@ FeedReader.prototype = {
         }
 
         var feed = new XML(message.response_body.data.replace(
-                /^<\?xml\s+version\s*=\s*(["'])[^\1]+\1[^?]*\?>/, ""));
+                /^<\?xml\s+.*\?>/g, ''));
 
         /* Process RSS to update channel data */
         this.title = String(feed..channel.title);
