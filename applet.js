@@ -24,6 +24,7 @@ imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
 const Applet = imports.ui.applet;
 const FeedReader = imports.feedreader;
+const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const Lang = imports.lang;
@@ -40,23 +41,55 @@ function FeedMenuItem() {
 FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (label, url, read, id, reader, params) {
+    _init: function (label, url, read, id, reader, icon_path, on_update, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
+        this._on_update = on_update;
         this.reader = reader;
         this.url = url;
-        this.read = read;
         this.id = id;
-        this.reader = reader;
+
+        if (read)
+            var icon_filename = icon_path +  'rss-deactivated.svg';
+        else
+            var icon_filename = icon_path + 'rss-highlight.svg';
+
+        var fi = undefined;
+        try {
+            fi = new Gio.FileIcon({ file: Gio.file_new_for_path(icon_filename) });
+        } catch (e) {
+            global.logError('Failed to load icon file ' + icon_filename + ' : ' + e);
+        }
+
+        if (fi != undefined)
+            this.addActor(new St.Icon({ gicon: fi, icon_size: 16 }));
+
         this.addActor(new St.Label({ text: label }));
     },
 
+    refresh: function() {
+        if (this._icon != undefined)
+            this.removeActor(this._icon);
+        if (this._label != undefined)
+            this.removeActor(this._label);
+
+        if (this.read)
+            this._icon= new St.Icon({ gicon: this._read_icon, icon_size: 16 });
+        else
+            this._icon= new St.Icon({ gicon: this._unread_icon, icon_size: 16 });
+
+        this._label = new St.Label({ text: this.label });
+
+        this.addActor(this._icon);
+        this.addActor(this._label);
+    },
+
     read_item: function() {
-        this.reader.mark_item_read(this.id);
         Util.spawnCommandLine('xdg-open ' + this.url);
+        this.reader.mark_item_read(this.id);
+        this._on_update();
     },
 };
-
 
 function FeedApplet(metadata, orientation) {
     this._init(metadata, orientation);
@@ -115,7 +148,10 @@ FeedApplet.prototype = {
                     this.reader.items[i].link,
                     this.reader.items[i].read,
                     this.reader.items[i].id,
-                    this.reader);
+                    this.reader,
+                    this.icon_path,
+                    Lang.bind(this, this.on_update)
+                    );
             item.connect("activate", function(actor, event) {
                 actor.read_item();
             });
