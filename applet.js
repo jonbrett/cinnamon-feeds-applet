@@ -91,15 +91,15 @@ FeedMenuItem.prototype = {
     },
 };
 
-function FeedApplet(metadata, orientation) {
-    this._init(metadata, orientation);
+function FeedApplet(metadata, orientation, panel_height, instance_id) {
+    this._init(metadata, orientation, panel_height, instance_id);
 }
 
 FeedApplet.prototype = {
     __proto__: Applet.IconApplet.prototype,
 
-    _init: function(metadata, orientation) {
-        Applet.IconApplet.prototype._init.call(this, orientation);
+    _init: function(metadata, orientation, panel_height, instance_id) {
+        Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
 
         try {
             this.icon_path = metadata.path + '/icons/';
@@ -179,6 +179,6 @@ FeedApplet.prototype = {
     }
 };
 
-function main(metadata, orientation) {
-    return new FeedApplet(metadata, orientation);
+function main(metadata, orientation, panel_height, instance_id) {
+    return new FeedApplet(metadata, orientation, panel_height, instance_id);
 }

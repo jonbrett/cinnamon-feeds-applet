@@ -6,5 +6,6 @@
         "jonbrett.dev@gmail.com"
     ],
     "version": 0.1,
-    "url": "jonbrettdev.wordpress.com"
+    "url": "jonbrettdev.wordpress.com",
+    "max-instances": "10"
 }
