@@ -69,7 +69,8 @@ FeedApplet.prototype = {
         Applet.IconApplet.prototype._init.call(this, orientation);
 
         try {
-            this.set_applet_icon_name("news-feed");
+            this.icon_path = metadata.path + '/icons/';
+            this.set_applet_icon_path(this.icon_path + 'rss.svg');
             this.set_applet_tooltip(_("Feed reader"));
 
             this.menuManager = new PopupMenu.PopupMenuManager(this);
@@ -98,7 +99,6 @@ FeedApplet.prototype = {
     },
 
     build_menu: function() {
-        this.set_applet_tooltip(this.reader.title);
 
         this.menu.removeAll();
 
@@ -106,6 +106,8 @@ FeedApplet.prototype = {
         this.menu.addMenuItem(item);
         item = new PopupMenu.PopupSeparatorMenuItem();
         this.menu.addMenuItem(item);
+
+        var unread_count = 0;
 
         for (var i = 0; i < this.reader.items.length; i++) {
             var item = new FeedMenuItem(
@@ -118,6 +120,17 @@ FeedApplet.prototype = {
                 actor.read_item();
             });
             this.menu.addMenuItem(item);
+
+            if (!this.reader.items[i].read)
+                unread_count++;
+        }
+
+        if (unread_count > 0) {
+            this.set_applet_icon_path(this.icon_path + 'rss-highlight.svg');
+            this.set_applet_tooltip(this.reader.title + ' [' + unread_count + ']');
+        } else {
+            this.set_applet_icon_path(this.icon_path + 'rss.svg');
+            this.set_applet_tooltip(this.reader.title);
         }
     },
 
