@@ -54,7 +54,7 @@ FeedMenuItem.prototype = {
         if (read)
             var icon_filename = icon_path +  'rss-deactivated.svg';
         else
-            var icon_filename = icon_path + 'rss-highlight.svg';
+            var icon_filename = icon_path + 'rss.svg';
 
         var fi = undefined;
         try {
@@ -64,9 +64,9 @@ FeedMenuItem.prototype = {
         }
 
         if (fi != undefined)
-            this.addActor(new St.Icon({ gicon: fi, icon_size: 16 }));
+            this.addActor(new St.Icon({ gicon: fi, icon_size: 16 , style_class: 'feedreader-item-icon' }));
 
-        this.addActor(new St.Label({ text: label }));
+        this.addActor(new St.Label({ text: label, style_class: 'feedreader-item-label' }));
     },
 
     read_item: function() {
@@ -177,10 +177,10 @@ FeedApplet.prototype = {
         }
 
         if (unread_count > 0) {
-            this.set_applet_icon_path(this.icon_path + 'rss-highlight.svg');
+            this.set_applet_icon_path(this.icon_path + 'rss.svg');
             this.set_applet_tooltip(this.reader.title + ' [' + unread_count + ']');
         } else {
-            this.set_applet_icon_path(this.icon_path + 'rss.svg');
+            this.set_applet_icon_path(this.icon_path + 'rss-deactivated.svg');
             this.set_applet_tooltip(this.reader.title);
         }
     },
