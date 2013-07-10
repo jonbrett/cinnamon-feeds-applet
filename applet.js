@@ -64,7 +64,7 @@ FeedMenuItem.prototype = {
         }
 
         if (fi != undefined)
-            this.addActor(new St.Icon({ gicon: fi, icon_size: 16 , style_class: 'feedreader-item-icon' }));
+            this.addActor(new St.Icon({ gicon: fi, icon_size: 16 , style_class: 'popup-menu-icon' }));
 
         this.addActor(new St.Label({ text: label, style_class: 'feedreader-item-label' }));
     },
@@ -73,6 +73,44 @@ FeedMenuItem.prototype = {
         Util.spawnCommandLine('xdg-open ' + this.url);
         this.reader.mark_item_read(this.id);
         this._on_update();
+    },
+};
+
+/* Menu item for displaying the feed title*/
+function FeedTitleItem() {
+    this._init.apply(this, arguments);
+}
+
+FeedTitleItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (title, url, owner, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        this.title = title;
+        this.url = url;
+        this.owner = owner;
+
+        this.addActor(new St.Label({ text: title, style_class: 'feedreader-title-label' }));
+
+        let button = new St.Button();
+        let icon = new St.Icon({icon_name: "document-open-symbolic", style_class: 'popup-menu-icon'});
+        button.set_child(icon);
+        button.url = url;
+        button.connect('clicked', Lang.bind(this, function(button, event) {
+            Util.spawnCommandLine('xdg-open ' + this.url);
+            this.owner.menu.close();
+        }));
+        this.addActor(button);
+
+        button = new St.Button();
+        icon = new St.Icon({icon_name: "document-open-symbolic", style_class: 'popup-menu-icon'});
+        button.set_child(icon);
+        button.connect('clicked', Lang.bind(this, function(button, event) {
+            this.owner.menu.close();
+        }));
+        this.addActor(button);
+
     },
 };
 
@@ -149,7 +187,7 @@ FeedApplet.prototype = {
 
         this.menu.removeAll();
 
-        var item = new PopupMenu.PopupMenuItem(this.reader.title);
+        var item = new FeedTitleItem(this.reader.title, this.reader.link, this);
         this.menu.addMenuItem(item);
         item = new PopupMenu.PopupSeparatorMenuItem();
         this.menu.addMenuItem(item);
