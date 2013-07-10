@@ -68,23 +68,6 @@ FeedMenuItem.prototype = {
         this.addActor(new St.Label({ text: label }));
     },
 
-    refresh: function() {
-        if (this._icon != undefined)
-            this.removeActor(this._icon);
-        if (this._label != undefined)
-            this.removeActor(this._label);
-
-        if (this.read)
-            this._icon= new St.Icon({ gicon: this._read_icon, icon_size: 16 });
-        else
-            this._icon= new St.Icon({ gicon: this._unread_icon, icon_size: 16 });
-
-        this._label = new St.Label({ text: this.label });
-
-        this.addActor(this._icon);
-        this.addActor(this._label);
-    },
-
     read_item: function() {
         Util.spawnCommandLine('xdg-open ' + this.url);
         this.reader.mark_item_read(this.id);
