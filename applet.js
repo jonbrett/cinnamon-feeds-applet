@@ -26,6 +26,7 @@ const Applet = imports.ui.applet;
 const FeedReader = imports.feedreader;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
+const Gtk = imports.gi.Gtk;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const Lang = imports.lang;
 const PopupMenu = imports.ui.popupMenu;
@@ -101,6 +102,8 @@ FeedApplet.prototype = {
 
         this.init_settings();
 
+        this.build_context_menu();
+
         this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
     },
 
@@ -114,6 +117,16 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "max_items", "max_items", this.build_menu, null);
         this.build_menu();
+    },
+
+    build_context_menu: function() {
+        var s = new Applet.MenuItem(
+                _("Settings"),
+                Gtk.STOCK_EDIT,
+                Lang.bind(this, function() {
+                    Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
+                }));
+      this._applet_context_menu.addMenuItem(s);
     },
 
     url_changed: function() {
