@@ -4,5 +4,14 @@
         "default" : "http://segfault.linuxmint.com/feed/",
         "description" : "Feed URL",
         "tooltip" : "Enter the URL of a valid RSS feed"
+    },
+    "max_items": {
+            "type": "scale",
+            "default" : 10,
+            "min" : 1,
+            "max" : 50,
+            "step" : 1,
+            "description" : "Maximum number of items",
+            "tooltip" : "Maximum number of items to display for this feed"
     }
 }

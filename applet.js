@@ -125,15 +125,15 @@ FeedApplet.prototype = {
         this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                                 "url",
-                                 "url",
-                                 this.url_changed,
-                                 null);
+                "url", "url", this.url_changed, null);
         this.url_changed();
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "max_items", "max_items", this.build_menu, null);
+        this.build_menu();
     },
 
     url_changed: function() {
-        global.log('url changed to ' + this.url);
         this.reader = new FeedReader.FeedReader(
                 this.url,
                 this.path + '/feeds',
@@ -160,7 +160,8 @@ FeedApplet.prototype = {
 
         var unread_count = 0;
 
-        for (var i = 0; i < this.reader.items.length; i++) {
+        for (var i = 0; i < Math.min(this.reader.items.length, this.max_items);
+                i++) {
             var item = new FeedMenuItem(
                     this.reader.items[i].title,
                     this.reader.items[i].link,
