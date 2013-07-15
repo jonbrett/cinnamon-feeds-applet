@@ -112,6 +112,12 @@ FeedReader.prototype = {
         }
     },
 
+    mark_all_items_read: function() {
+        for (var i = 0; i < this.items.length; i++)
+            this.items[i].read = true;
+        this.save_items();
+    },
+
     save_items: function() {
         try {
             var dir = Gio.file_new_for_path(this.path);

@@ -32,6 +32,7 @@ const Lang = imports.lang;
 const PopupMenu = imports.ui.popupMenu;
 const Settings = imports.ui.settings;
 const St = imports.gi.St;
+const Tooltips = imports.ui.tooltips;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
 
@@ -63,10 +64,14 @@ FeedMenuItem.prototype = {
             global.logError('Failed to load icon file ' + icon_filename + ' : ' + e);
         }
 
-        if (fi != undefined)
-            this.addActor(new St.Icon({ gicon: fi, icon_size: 16 , style_class: 'popup-menu-icon' }));
+        let box = new St.BoxLayout({ style_class: 'feedreader-item' });
 
-        this.addActor(new St.Label({ text: label, style_class: 'feedreader-item-label' }));
+        if (fi != undefined)
+            box.add(new St.Icon({ gicon: fi, icon_size: 16 , style_class: 'popup-menu-icon' }));
+
+        box.add(new St.Label({ text: label, style_class: 'feedreader-item-label' }));
+
+        this.addActor(box);
     },
 
     read_item: function() {
@@ -85,32 +90,45 @@ FeedTitleItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
     _init: function (title, url, owner, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {reactive: false});
 
         this.title = title;
         this.url = url;
         this.owner = owner;
 
-        this.addActor(new St.Label({ text: title, style_class: 'feedreader-title-label' }));
+        let box = new St.BoxLayout({ style_class: 'feedreader-title' });
 
-        let button = new St.Button();
-        let icon = new St.Icon({icon_name: "document-open-symbolic", style_class: 'popup-menu-icon'});
+        box.add(new St.Label({ text: title, style_class: 'feedreader-title-label' }));
+
+        let button = new St.Button({ reactive: true });
+        let icon = new St.Icon({
+            icon_name: "web-browser-symbolic",
+            style_class: 'popup-menu-icon'
+        });
         button.set_child(icon);
         button.url = url;
         button.connect('clicked', Lang.bind(this, function(button, event) {
             Util.spawnCommandLine('xdg-open ' + this.url);
             this.owner.menu.close();
         }));
-        this.addActor(button);
 
-        button = new St.Button();
-        icon = new St.Icon({icon_name: "document-open-symbolic", style_class: 'popup-menu-icon'});
+        let tooltip = new Tooltips.Tooltip(button, this.url);
+        box.add(button);
+
+        button = new St.Button({ reactive: true });
+        icon = new St.Icon({ icon_name: "edit-clear-symbolic",
+            style_class: 'popup-menu-icon'
+        });
         button.set_child(icon);
         button.connect('clicked', Lang.bind(this, function(button, event) {
             this.owner.menu.close();
+            this.owner.reader.mark_all_items_read();
+            this.owner.build_menu();
         }));
-        this.addActor(button);
+        let tooltip = new Tooltips.Tooltip(button, _("Mark all as read"));
+        box.add(button);
 
+        this.addActor(box);
     },
 };
 

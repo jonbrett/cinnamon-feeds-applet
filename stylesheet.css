@@ -1,5 +1,11 @@
-.feedreader-item-icon {
+.feedreader-title {
+    spacing: .5em;
 }
 
-.feedreader-item-label {
+.feedreader-title-label {
+    font-weight: bold;
+}
+
+.feedreader-item {
+    spacing: 1em;
 }
