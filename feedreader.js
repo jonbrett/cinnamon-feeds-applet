@@ -189,15 +189,16 @@ FeedReader.prototype = {
     },
 
     _add_items: function(items) {
-        var new_count = 0;
+        var new_items = []
         for (var i = 0; i < items.length; i++) {
-            if (this._get_item_by_id(items[i].id) == null) {
-                new_count++;
-                this.items.push(items[i]);
-            }
+            if (this._get_item_by_id(items[i].id) == null)
+                new_items.push(items[i]);
         }
-        global.log('Retrieved ' + new_count + ' new items for ' + this.url);
-        return new_count;
+
+        this.items = new_items.concat(this.items);
+
+        global.log('Retrieved ' + new_items.length + ' new items for ' + this.url);
+        return new_items.length;
     },
 
     _get_item_by_id: function(id) {
