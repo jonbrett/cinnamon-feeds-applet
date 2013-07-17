@@ -29,6 +29,7 @@ const GLib = imports.gi.GLib;
 const Gtk = imports.gi.Gtk;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const Lang = imports.lang;
+const Mainloop = imports.mainloop;
 const PopupMenu = imports.ui.popupMenu;
 const Settings = imports.ui.settings;
 const St = imports.gi.St;
@@ -156,11 +157,11 @@ FeedApplet.prototype = {
             global.logError(e);
         }
 
+        this.timeout = 5 * 60 * 1000; /* Default 5 mins refresh period */
+
         this.init_settings();
 
         this.build_context_menu();
-
-        this.timeout = GLib.timeout_add_seconds(0, 60, Lang.bind(this, this.refresh));
     },
 
     init_settings: function(instance_id) {
@@ -241,9 +242,21 @@ FeedApplet.prototype = {
         }
     },
 
+
     refresh: function() {
+        /* Remove any previous timeout */
+        if (this.timer_id) {
+            Mainloop.source_remove(this.timer_id);
+            this.timer_id = 0;
+        }
+
+        /* Get feed data */
         if (this.reader != undefined)
             this.reader.get()
+
+        /* Set the next timeout */
+        this.timer_id = Mainloop.timeout_add(this.timeout,
+                Lang.bind(this, this.refresh));
     },
 
     on_applet_clicked: function(event) {
