@@ -24,6 +24,10 @@ const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 const _ = Gettext.gettext;
 
+/* Maximum number of "cached" feed items to keep for this feed.
+ * Older items will be trimmed first */
+const MAX_FEED_ITEMS = 100;
+
 function FeedReader(url, path, max_item, callbacks) {
     this._init(url, path, max_item, callbacks);
 }
@@ -99,6 +103,7 @@ FeedReader.prototype = {
 
         /* We are only interested in new items that we haven't seen before */
         if (this._add_items(new_items) > 0) {
+            this.prune_items();
             this.save_items();
             this.callbacks.onUpdate();
         }
@@ -209,6 +214,9 @@ FeedReader.prototype = {
         return null;
     },
 
+    prune_items: function() {
+        this.items = this.items.slice(0, MAX_FEED_ITEMS);
+    },
 };
 
 function sanitize_url(url) {
