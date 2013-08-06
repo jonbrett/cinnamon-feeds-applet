@@ -1,7 +1,7 @@
 {
     "uuid": "feeds@jonbrettdev.wordpress.com",
     "name": "Feeds Reader",
-    "description": "Aggregates and displays RSS news feeds",
+    "description": "Displays RSS news feeds",
     "original-authors": [
         "jonbrett.dev@gmail.com"
     ],
