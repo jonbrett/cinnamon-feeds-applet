@@ -1,0 +1,8 @@
+0.2
+===
+- Fix applet icon size (use symbolic icons). [Issue #3]
+
+0.1
+===
+- Initial release
+- Supports single RSS feed
