@@ -54,9 +54,9 @@ FeedMenuItem.prototype = {
         this.id = id;
 
         if (read)
-            var icon_filename = icon_path +  'rss-deactivated.svg';
+            var icon_filename = icon_path +  'rss-deactivated-symbolic.svg';
         else
-            var icon_filename = icon_path + 'rss.svg';
+            var icon_filename = icon_path + 'rss-symbolic.svg';
 
         var fi = undefined;
         try {
@@ -146,7 +146,8 @@ FeedApplet.prototype = {
         try {
             this.path = metadata.path;
             this.icon_path = metadata.path + '/icons/';
-            this.set_applet_icon_path(this.icon_path + 'rss.svg');
+            Gtk.IconTheme.get_default().append_search_path(this.icon_path);
+            this.set_applet_icon_symbolic_name("rss");
             this.set_applet_tooltip(_("Feed reader"));
 
             this.menuManager = new PopupMenu.PopupMenuManager(this);
@@ -234,10 +235,10 @@ FeedApplet.prototype = {
         }
 
         if (unread_count > 0) {
-            this.set_applet_icon_path(this.icon_path + 'rss.svg');
+            this.set_applet_icon_symbolic_name("rss");
             this.set_applet_tooltip(this.reader.title + ' [' + unread_count + ']');
         } else {
-            this.set_applet_icon_path(this.icon_path + 'rss-deactivated.svg');
+            this.set_applet_icon_symbolic_name("rss-deactivated");
             this.set_applet_tooltip(this.reader.title);
         }
     },
