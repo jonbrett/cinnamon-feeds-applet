@@ -54,9 +54,9 @@ FeedMenuItem.prototype = {
         this.id = id;
 
         if (read)
-            var icon_filename = icon_path +  'rss-deactivated-symbolic.svg';
+            var icon_filename = icon_path +  'feed-symbolic.svg';
         else
-            var icon_filename = icon_path + 'rss-symbolic.svg';
+            var icon_filename = icon_path + 'feed-new-symbolic.svg';
 
         var fi = undefined;
         try {
@@ -68,7 +68,7 @@ FeedMenuItem.prototype = {
         let box = new St.BoxLayout({ style_class: 'feedreader-item' });
 
         if (fi != undefined)
-            box.add(new St.Icon({ gicon: fi, icon_size: 16 , style_class: 'popup-menu-icon' }));
+            box.add(new St.Icon({ gicon: fi, icon_size: 16, icon_type: St.IconType.SYMBOLIC, style_class: 'popup-menu-icon' }));
 
         box.add(new St.Label({ text: label, style_class: 'feedreader-item-label' }));
 
@@ -235,10 +235,10 @@ FeedApplet.prototype = {
         }
 
         if (unread_count > 0) {
-            this.set_applet_icon_symbolic_name("rss");
+            this.set_applet_icon_symbolic_name("feed-new");
             this.set_applet_tooltip(this.reader.title + ' [' + unread_count + ']');
         } else {
-            this.set_applet_icon_symbolic_name("rss-deactivated");
+            this.set_applet_icon_symbolic_name("feed");
             this.set_applet_tooltip(this.reader.title);
         }
     },
