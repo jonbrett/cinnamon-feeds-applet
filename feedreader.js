@@ -73,8 +73,12 @@ FeedReader.prototype = {
             return;
         }
 
-        var feed = new XML(message.response_body.data.replace(
-                /^<\?xml\s+.*\?>/g, ''));
+        try {
+            var feed = new XML(message.response_body.data.replace(
+                    /^<\?xml\s+.*\?>/g, ''));
+        } catch (e) {
+            global.log('Failed to parse XML ' + e);
+        }
 
         /* Process RSS to update channel data */
         this.title = String(feed..channel.title);
