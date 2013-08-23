@@ -28,8 +28,8 @@ const _ = Gettext.gettext;
  * Older items will be trimmed first */
 const MAX_FEED_ITEMS = 100;
 
-function FeedReader(url, path, max_item, callbacks) {
-    this._init(url, path, max_item, callbacks);
+function FeedReader() {
+    this._init.apply(this, arguments);
 }
 
 FeedReader.prototype = {

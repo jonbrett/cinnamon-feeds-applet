@@ -133,8 +133,8 @@ FeedTitleItem.prototype = {
     },
 };
 
-function FeedApplet(metadata, orientation, panel_height, instance_id) {
-    this._init(metadata, orientation, panel_height, instance_id);
+function FeedApplet() {
+    this._init.apply(this, arguments);
 }
 
 FeedApplet.prototype = {
