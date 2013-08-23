@@ -22,11 +22,40 @@ const Gettext = imports.gettext.domain('cinnamon-applets');
 const Gio = imports.gi.Gio;
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
+const Util = imports.misc.util;
 const _ = Gettext.gettext;
 
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
 const MAX_FEED_ITEMS = 100;
+
+/* FeedItem objects are used to store data for a single item in a news feed */
+function FeedItem() {
+    this._init.apply(this, arguments);
+}
+
+FeedItem.prototype = {
+
+    _init: function(id, title, link, description, read, reader) {
+        this.id = id;
+        this.title = title;
+        this.link = link;
+        this.description = description;
+        this.read = read;
+
+        this.reader = reader;
+    },
+
+    open: function() {
+        this.read = true;
+        try {
+            Util.spawnCommandLine('xdg-open ' + this.link);
+        } catch (e) {
+            global.logError(e);
+        }
+        this.reader.save_items();
+    },
+}
 
 function FeedReader() {
     this._init.apply(this, arguments);
@@ -89,20 +118,19 @@ FeedReader.prototype = {
         var new_items = new Array();
 
         for (var i = 0; i < rss_item.length(); i++) {
-            var new_item = {
-                'title': String(rss_item[i].title),
-                'link': String(rss_item[i].link),
-                'description': String(rss_item[i].description),
-                'id': String(rss_item[i].guid),
-                'read': false
-            };
+            /* guid is optional in RSS spec, so use link as
+             * identifier if it's not present */
+            let id = String(rss_item[i].guid);
+            if (id == '')
+                id = rss_item[i].link
 
-            /* guid is optional in RSS spec, so use link as identifier if it's
-             * not present */
-            if (new_item.id == '')
-                new_item.id = new_item.link;
-
-            new_items.push(new_item);
+            new_items.push(new FeedItem(
+                    id,
+                    String(rss_item[i].title),
+                    String(rss_item[i].link),
+                    String(rss_item[i].description),
+                    false,
+                    this));
         }
 
         /* We are only interested in new items that we haven't seen before */
@@ -141,11 +169,25 @@ FeedReader.prototype = {
             var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
             var fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            /* We convert the items array into a more simple
+             * array that contains only the necessary info to
+             * recreate each item. I.e. we do not store
+             * run-time references to other objects */
+            var simple_items = new Array();
+            for (var i = 0; i < this.items.length; i++) {
+                simple_items.push({
+                    "id": this.items[i].id,
+                    "title": this.items[i].title,
+                    "link": this.items[i].link,
+                    "description": this.items[i].description,
+                    "read": this.items[i].read,
+                });
+            }
             var data = {
                 "title": this.title,
                 "link": this.link,
                 "description": this.description,
-                "items": this.items
+                "items": simple_items,
             };
 
             fs.write(escape(JSON.stringify(data)), null);
@@ -160,8 +202,8 @@ FeedReader.prototype = {
             var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
             var fs = file.open_readwrite(null);
         } catch (e) {
-            /* File doesn't exist yet. This is fine */
-            global.log("No feed backing file (this is fine for a new feed)");
+            /* File doesn't exist yet. This is expected for a
+             * new feed */
             return;
         }
 
@@ -171,6 +213,8 @@ FeedReader.prototype = {
             var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {
+
+                /* Load feedreader data */
                 if (data.title != undefined)
                     this.title = data.title;
                 else
@@ -182,12 +226,18 @@ FeedReader.prototype = {
                 if (data.description != undefined)
                     this.description = data.description;
 
+                this.items = new Array();
                 if (data.items != undefined)
-                    this.items = data.items
-                else
-                    this.items = new Array();
+                    for (var i = 0; i < data.items.length; i++)
+                        this.items.push(new FeedItem(
+                                    data.items[i].id,
+                                    data.items[i].title,
+                                    data.items[i].link,
+                                    data.items[i].description,
+                                    data.items[i].read,
+                                    this));
             } else {
-                global.logError('Invalid data loaded for ' + this.url);
+                global.logError('Invalid data file for ' + this.url);
             }
         } catch (e) {
             /* Invalid file contents */
@@ -204,6 +254,9 @@ FeedReader.prototype = {
                 new_items.push(items[i]);
         }
 
+        /* New items go at the beginnning of the array to
+         * preserve ordering (RSS feeds usually have newer
+         * items first) */
         this.items = new_items.concat(this.items);
 
         global.log('Retrieved ' + new_items.length + ' new items for ' + this.url);

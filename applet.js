@@ -45,15 +45,13 @@ function FeedMenuItem() {
 FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (label, url, read, id, reader, icon_path, on_update, params) {
+    _init: function (item, icon_path, on_update, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
         this._on_update = on_update;
-        this.reader = reader;
-        this.url = url;
-        this.id = id;
+        this.item = item;
 
-        if (read)
+        if (this.item.read)
             var icon_filename = icon_path +  'feed-symbolic.svg';
         else
             var icon_filename = icon_path + 'feed-new-symbolic.svg';
@@ -70,14 +68,13 @@ FeedMenuItem.prototype = {
         if (fi != undefined)
             box.add(new St.Icon({ gicon: fi, icon_size: 16, icon_type: St.IconType.SYMBOLIC, style_class: 'popup-menu-icon' }));
 
-        box.add(new St.Label({ text: label, style_class: 'feedreader-item-label' }));
+        box.add(new St.Label({ text: item.title, style_class: 'feedreader-item-label' }));
 
         this.addActor(box);
     },
 
     read_item: function() {
-        Util.spawnCommandLine('xdg-open ' + this.url);
-        this.reader.mark_item_read(this.id);
+        this.item.open();
         this._on_update();
     },
 };
@@ -217,14 +214,9 @@ FeedApplet.prototype = {
         for (var i = 0; i < Math.min(this.reader.items.length, this.max_items);
                 i++) {
             var item = new FeedMenuItem(
-                    this.reader.items[i].title,
-                    this.reader.items[i].link,
-                    this.reader.items[i].read,
-                    this.reader.items[i].id,
-                    this.reader,
+                    this.reader.items[i],
                     this.icon_path,
-                    Lang.bind(this, this.on_update)
-                    );
+                    Lang.bind(this, this.on_update));
             item.connect("activate", function(actor, event) {
                 actor.read_item();
             });
