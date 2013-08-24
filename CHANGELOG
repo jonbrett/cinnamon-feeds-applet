@@ -1,3 +1,10 @@
+0.3
+===
+- Parsing of HTTP response XML in try-catch statement to avoid potential Cinnamon crash
+- Full use of symbolic icons throughout. [Issue #5]
+- New icon theme (based on standard RSS icon)
+- Some refactoring of feedreader backend
+
 0.2
 ===
 - Fix applet icon size (use symbolic icons). [Issue #3]
