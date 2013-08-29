@@ -167,7 +167,7 @@ FeedReader.prototype = {
 
     save_items: function() {
         try {
-            var dir = Gio.file_new_for_path(this.path);
+            var dir = Gio.file_parse_name(this.path);
             if (!dir.query_exists(null)) {
                 dir.make_directory_with_parents(null);
             }
@@ -200,17 +200,14 @@ FeedReader.prototype = {
 
     load_items: function() {
         try {
-            var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
-            var fs = file.open_readwrite(null);
+            let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
+            var content = Cinnamon.get_file_contents_utf8_sync(path);
         } catch (e) {
-            /* File doesn't exist yet. This is expected for a
-             * new feed */
+            /* This is fine for new feeds */
             return;
         }
 
         try {
-            var content = Cinnamon.get_file_contents_utf8_sync(
-                    this.path + '/' + sanitize_url(this.url));
             var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {

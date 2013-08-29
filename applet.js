@@ -187,7 +187,7 @@ FeedApplet.prototype = {
     url_changed: function() {
         this.reader = new FeedReader.FeedReader(
                 this.url,
-                this.path + '/feeds',
+                '~/.cinnamon/' + UUID + '/' + this.instance_id,
                 5,
                 {
                     'onUpdate' : Lang.bind(this, this.on_update)
