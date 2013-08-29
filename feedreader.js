@@ -47,14 +47,18 @@ FeedItem.prototype = {
     },
 
     open: function() {
-        this.read = true;
         try {
             Util.spawnCommandLine('xdg-open ' + this.link);
         } catch (e) {
             global.logError(e);
         }
+        this.mark_read();
         this.reader.save_items();
     },
+
+    mark_read: function() {
+        this.read = true;
+    }
 }
 
 function FeedReader() {
@@ -75,6 +79,7 @@ FeedReader.prototype = {
         this.description = "";
         this.link = "";
         this.items = new Array();
+        this.read_list = new Array();
 
         /* Init HTTP session */
         try {
@@ -116,13 +121,14 @@ FeedReader.prototype = {
 
         var rss_item = feed..channel.item;
         var new_items = new Array();
+        var new_count = 0;
 
         for (var i = 0; i < rss_item.length(); i++) {
             /* guid is optional in RSS spec, so use link as
              * identifier if it's not present */
             let id = String(rss_item[i].guid);
             if (id == '')
-                id = rss_item[i].link
+                id = rss_item[i].link;
 
             new_items.push(new FeedItem(
                     id,
@@ -131,27 +137,31 @@ FeedReader.prototype = {
                     String(rss_item[i].description),
                     false,
                     this));
+
+            /* Is this item in the old list or a new item
+             * For existing items, transfer "read" property
+             * For new items, check against the loaded historic read list */
+            let existing = this._get_item_by_id(id);
+            if (existing != null) {
+                new_items[i].read = existing.read
+            } else {
+                if (this._is_in_read_list(id))
+                    new_items[i].read = true;
+                new_count++;
+            }
         }
 
-        /* We are only interested in new items that we haven't seen before */
-        if (this._add_items(new_items) > 0) {
-            this.prune_items();
-            this.save_items();
+        /* Were there any new items? */
+        if (new_count > 0) {
+            global.log("Fetched " + new_count + " new items (" + new_items.length + " total) from " + this.url);
+            this.items = new_items;
             this.callbacks.onUpdate();
-        }
-    },
-
-    mark_item_read: function(id) {
-        var item = this._get_item_by_id(id);
-        if (item != null) {
-            item.read = true;
-            this.save_items();
         }
     },
 
     mark_all_items_read: function() {
         for (var i = 0; i < this.items.length; i++)
-            this.items[i].read = true;
+            this.items[i].mark_read();
         this.save_items();
     },
 
@@ -162,32 +172,23 @@ FeedReader.prototype = {
                 dir.make_directory_with_parents(null);
             }
 
-            /* Write feed items to a file as JSON.
+            /* Write feed items read list to a file as JSON.
              * I found escaping the string helps to deal with special
              * characters, which could cause problems when parsing the file
              * later */
             var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
             var fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-            /* We convert the items array into a more simple
-             * array that contains only the necessary info to
-             * recreate each item. I.e. we do not store
-             * run-time references to other objects */
-            var simple_items = new Array();
+
+            let read_list = [];
             for (var i = 0; i < this.items.length; i++) {
-                simple_items.push({
-                    "id": this.items[i].id,
-                    "title": this.items[i].title,
-                    "link": this.items[i].link,
-                    "description": this.items[i].description,
-                    "read": this.items[i].read,
-                });
+                if (this.items[i].read == true)
+                    read_list.push({ "id" : this.items[i].id });
             }
+
             var data = {
                 "title": this.title,
-                "link": this.link,
-                "description": this.description,
-                "items": simple_items,
+                "read_list": read_list,
             };
 
             fs.write(escape(JSON.stringify(data)), null);
@@ -213,29 +214,16 @@ FeedReader.prototype = {
             var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {
-
                 /* Load feedreader data */
                 if (data.title != undefined)
                     this.title = data.title;
                 else
                     this.title = _("Loading feed");
 
-                if (data.link != undefined)
-                    this.link = data.link;
-
-                if (data.description != undefined)
-                    this.description = data.description;
-
-                this.items = new Array();
-                if (data.items != undefined)
-                    for (var i = 0; i < data.items.length; i++)
-                        this.items.push(new FeedItem(
-                                    data.items[i].id,
-                                    data.items[i].title,
-                                    data.items[i].link,
-                                    data.items[i].description,
-                                    data.items[i].read,
-                                    this));
+                if (data.read_list != undefined)
+                    this.read_list = data.read_list;
+                else
+                    this.read_list = new Array();
             } else {
                 global.logError('Invalid data file for ' + this.url);
             }
@@ -243,24 +231,6 @@ FeedReader.prototype = {
             /* Invalid file contents */
             global.logError('Failed to read feed data file for ' + this.url + ':' + e);
         }
-
-        global.log('Loaded ' + this.items.length + ' items for ' + this.url);
-    },
-
-    _add_items: function(items) {
-        var new_items = []
-        for (var i = 0; i < items.length; i++) {
-            if (this._get_item_by_id(items[i].id) == null)
-                new_items.push(items[i]);
-        }
-
-        /* New items go at the beginnning of the array to
-         * preserve ordering (RSS feeds usually have newer
-         * items first) */
-        this.items = new_items.concat(this.items);
-
-        global.log('Retrieved ' + new_items.length + ' new items for ' + this.url);
-        return new_items.length;
     },
 
     _get_item_by_id: function(id) {
@@ -271,8 +241,12 @@ FeedReader.prototype = {
         return null;
     },
 
-    prune_items: function() {
-        this.items = this.items.slice(0, MAX_FEED_ITEMS);
+    _is_in_read_list: function(id) {
+        for (var i = 0; i < this.read_list.length; i++) {
+            if (this.read_list[i].id == id)
+                return true;
+        }
+        return false;
     },
 };
 
