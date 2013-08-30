@@ -17,9 +17,11 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+const ByteArray = imports.byteArray;
 const Cinnamon = imports.gi.Cinnamon;
 const Gettext = imports.gettext.domain('cinnamon-applets');
 const Gio = imports.gi.Gio;
+const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 const Util = imports.misc.util;
@@ -80,6 +82,7 @@ FeedReader.prototype = {
         this.link = "";
         this.items = new Array();
         this.read_list = new Array();
+        this.image_url = '';
 
         /* Init HTTP session */
         try {
@@ -118,6 +121,10 @@ FeedReader.prototype = {
         this.title = String(feed..channel.title);
         this.description = String(feed..channel.description);
         this.link = String(feed..channel.link);
+        this.image_url = String(feed..channel.image.url);
+
+        /* Fetch image */
+        this._fetch_image();
 
         var rss_item = feed..channel.item;
         var new_items = new Array();
@@ -227,6 +234,48 @@ FeedReader.prototype = {
         } catch (e) {
             /* Invalid file contents */
             global.logError('Failed to read feed data file for ' + this.url + ':' + e);
+        }
+    },
+
+    _fetch_image: function() {
+        if (this.image_url == '')
+            return;
+
+        /* Use local file if it already exists */
+        let f = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image_url));
+        if (f.query_exists(null))
+            return;
+
+        /* Request image url */
+        let msg = Soup.Message.new('GET', this.image_url);
+        this.session.queue_message(msg,
+                Lang.bind(this, this._on_img_response));
+    },
+
+    _on_img_response: function(session, message) {
+        if (message.status_code != 200) {
+            global.log('HTTP request returned ' + message.status_code);
+            return;
+        }
+
+        try {
+            var dir = Gio.file_parse_name(this.path);
+            if (!dir.query_exists(null)) {
+                dir.make_directory_with_parents(null);
+            }
+
+            let file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image_url));
+            let fs = file.replace(null, false,
+                    Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+
+            fs.write(message.response_body.get_chunk(0).get_data(), null,
+                    message.response_body.length);
+            fs.close(null);
+
+            this.image_path = file.get_path();
+        } catch (e) {
+            global.log("Error saving feed image for " + this.url + ": " + e);
+            this.image_path = undefined;
         }
     },
 
