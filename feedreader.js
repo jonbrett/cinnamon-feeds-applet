@@ -82,7 +82,7 @@ FeedReader.prototype = {
         this.link = "";
         this.items = new Array();
         this.read_list = new Array();
-        this.image_url = '';
+        this.image = {}
 
         /* Init HTTP session */
         try {
@@ -121,7 +121,9 @@ FeedReader.prototype = {
         this.title = String(feed..channel.title);
         this.description = String(feed..channel.description);
         this.link = String(feed..channel.link);
-        this.image_url = String(feed..channel.image.url);
+        this.image.url = String(feed..channel.image.url);
+        this.image.width = String(feed..channel.image.width);
+        this.image.height = String(feed..channel.image.height);
 
         /* Fetch image */
         this._fetch_image();
@@ -238,16 +240,16 @@ FeedReader.prototype = {
     },
 
     _fetch_image: function() {
-        if (this.image_url == '')
+        if (this.image.url == undefined)
             return;
 
         /* Use local file if it already exists */
-        let f = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image_url));
+        let f = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
         if (f.query_exists(null))
             return;
 
         /* Request image url */
-        let msg = Soup.Message.new('GET', this.image_url);
+        let msg = Soup.Message.new('GET', this.image.url);
         this.session.queue_message(msg,
                 Lang.bind(this, this._on_img_response));
     },
@@ -264,7 +266,7 @@ FeedReader.prototype = {
                 dir.make_directory_with_parents(null);
             }
 
-            let file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image_url));
+            let file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
             let fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 
@@ -272,10 +274,10 @@ FeedReader.prototype = {
                     message.response_body.length);
             fs.close(null);
 
-            this.image_path = file.get_path();
+            this.image.path = file.get_path();
         } catch (e) {
             global.log("Error saving feed image for " + this.url + ": " + e);
-            this.image_path = undefined;
+            this.image.path = undefined;
         }
     },
 
