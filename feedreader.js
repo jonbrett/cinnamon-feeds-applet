@@ -240,13 +240,15 @@ FeedReader.prototype = {
     },
 
     _fetch_image: function() {
-        if (this.image.url == undefined)
+        if (this.image.url == undefined || this.image.url == '')
             return;
 
         /* Use local file if it already exists */
         let f = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
-        if (f.query_exists(null))
+        if (f.query_exists(null)) {
+            this.image.path = f.get_path();
             return;
+        }
 
         /* Request image url */
         let msg = Soup.Message.new('GET', this.image.url);
@@ -275,6 +277,7 @@ FeedReader.prototype = {
             fs.close(null);
 
             this.image.path = file.get_path();
+            this.callbacks.onUpdate();
         } catch (e) {
             global.log("Error saving feed image for " + this.url + ": " + e);
             this.image.path = undefined;

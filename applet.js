@@ -87,16 +87,39 @@ function FeedTitleItem() {
 FeedTitleItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (title, url, owner, params) {
+    _init: function (reader, owner, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {reactive: false});
 
-        this.title = title;
-        this.url = url;
+        this.title = reader.title;
+        this.url = reader.url;
         this.owner = owner;
 
         let box = new St.BoxLayout({ style_class: 'feedreader-title' });
 
-        box.add(new St.Label({ text: title, style_class: 'feedreader-title-label' }));
+        /* Use feed image where available for title */
+        if (reader.image.path != undefined) {
+            try {
+                if (reader.image.height != undefined)
+                    var height = reader.image.height;
+                else
+                    var height = 32;
+                if (reader.image.width != undefined)
+                    var width = reader.image.width;
+                else
+                    var width = 32;
+
+                let image = St.TextureCache.get_default().load_uri_async(GLib.filename_to_uri(reader.image.path, null), width, height);
+
+
+                box.add(image);
+            } catch (e) {
+                global.logError("Failed to load feed icon: " + reader.image.path);
+            }
+
+        } else {
+            box.add(new St.Label({ text: this.title,
+                style_class: 'feedreader-title-label' }));
+        }
 
         let button = new St.Button({ reactive: true });
         let icon = new St.Icon({
@@ -104,7 +127,7 @@ FeedTitleItem.prototype = {
             style_class: 'popup-menu-icon'
         });
         button.set_child(icon);
-        button.url = url;
+        button.url = this.url;
         button.connect('clicked', Lang.bind(this, function(button, event) {
             Util.spawnCommandLine('xdg-open ' + this.url);
             this.owner.menu.close();
@@ -204,7 +227,7 @@ FeedApplet.prototype = {
 
         this.menu.removeAll();
 
-        var item = new FeedTitleItem(this.reader.title, this.reader.link, this);
+        var item = new FeedTitleItem(this.reader, this);
         this.menu.addMenuItem(item);
         item = new PopupMenu.PopupSeparatorMenuItem();
         this.menu.addMenuItem(item);
