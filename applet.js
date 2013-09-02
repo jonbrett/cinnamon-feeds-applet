@@ -238,8 +238,6 @@ FeedApplet.prototype = {
 
         var item = new FeedTitleItem(this.reader, this);
         this.menu.addMenuItem(item);
-        item = new PopupMenu.PopupSeparatorMenuItem();
-        this.menu.addMenuItem(item);
 
         var unread_count = 0;
 
