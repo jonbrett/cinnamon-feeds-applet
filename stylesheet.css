@@ -2,6 +2,11 @@
     spacing: .5em;
 }
 
+.feedreader-title-buttons {
+    padding-left: .5em;
+    spacing: .5em;
+}
+
 .feedreader-title-label {
     font-weight: bold;
 }

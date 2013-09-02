@@ -94,7 +94,11 @@ FeedTitleItem.prototype = {
         this.url = reader.url;
         this.owner = owner;
 
-        let box = new St.BoxLayout({ style_class: 'feedreader-title' });
+        let container = new St.BoxLayout();
+        let mainbox = new St.BoxLayout({
+            style_class: 'feedreader-title',
+            vertical: true
+        });
 
         /* Use feed image where available for title */
         if (reader.image.path != undefined) {
@@ -102,29 +106,32 @@ FeedTitleItem.prototype = {
                 if (reader.image.height != undefined)
                     var height = reader.image.height;
                 else
-                    var height = 32;
+                    var height = 48;
                 if (reader.image.width != undefined)
                     var width = reader.image.width;
                 else
-                    var width = 32;
+                    var width = 48;
 
                 let image = St.TextureCache.get_default().load_uri_async(GLib.filename_to_uri(reader.image.path, null), width, height);
 
-
-                box.add(image);
+                let tooltip = new Tooltips.Tooltip(image, this.title);
+                mainbox.add(image);
             } catch (e) {
                 global.logError("Failed to load feed icon: " + reader.image.path);
             }
 
         } else {
-            box.add(new St.Label({ text: this.title,
-                style_class: 'feedreader-title-label' }));
+            mainbox.add(new St.Label({ text: this.title,
+                style_class: 'feedreader-title-label'
+            }));
         }
-
+        let buttonbox = new St.BoxLayout({
+            style_class: 'feedreader-title-buttons'
+        });
         let button = new St.Button({ reactive: true });
         let icon = new St.Icon({
             icon_name: "web-browser-symbolic",
-            style_class: 'popup-menu-icon'
+            style_class: 'popup-menu-icon',
         });
         button.set_child(icon);
         button.url = this.url;
@@ -134,7 +141,7 @@ FeedTitleItem.prototype = {
         }));
 
         let tooltip = new Tooltips.Tooltip(button, this.url);
-        box.add(button);
+        buttonbox.add(button);
 
         button = new St.Button({ reactive: true });
         icon = new St.Icon({ icon_name: "edit-clear-symbolic",
@@ -147,9 +154,11 @@ FeedTitleItem.prototype = {
             this.owner.build_menu();
         }));
         let tooltip = new Tooltips.Tooltip(button, _("Mark all as read"));
-        box.add(button);
+        buttonbox.add(button);
 
-        this.addActor(box);
+        mainbox.add(buttonbox);
+        container.add(mainbox);
+        this.addActor(container);
     },
 };
 
