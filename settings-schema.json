@@ -1,7 +1,7 @@
 {
     "url": {
         "type": "entry",
-        "default" : "http://segfault.linuxmint.com/feed/",
+        "default" : "http://fxfeeds.mozilla.com/en-US/firefox/headlines.xml",
         "description" : "Feed URL",
         "tooltip" : "Enter the URL of a valid RSS feed"
     },
