@@ -91,7 +91,7 @@ FeedTitleItem.prototype = {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {reactive: false});
 
         this.title = reader.title;
-        this.url = reader.url;
+        this.url = reader.link;
         this.owner = owner;
 
         let container = new St.BoxLayout();
