@@ -1,3 +1,12 @@
+0.4
+===
+- Download and display feed title image (where available) [Issue #2]
+- Add setting for feed update interval [Issue #6]
+- Add setting to hide read items [Issue #8]
+- Move backing files to ~/.cinnamon/uuid/ to preserve across upgrades [Issue #7]
+- Preserve feed order [Issue #10]
+- Default feed address now points to BBC World News headlines (sorry Segfault...)
+
 0.3
 ===
 - Parsing of HTTP response XML in try-catch statement to avoid potential Cinnamon crash
