@@ -37,6 +37,21 @@ const Tooltips = imports.ui.tooltips;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
 
+/* Menu item for displaying a simple message */
+function LabelMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+LabelMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (text, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        this.addActor(new St.Label({ text: text }));
+    },
+};
+
 /* Menu item for displaying an feed item */
 function FeedMenuItem() {
     this._init.apply(this, arguments);
@@ -207,6 +222,8 @@ FeedApplet.prototype = {
         this.url_changed();
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_read_items", "show_read_items", this.build_menu, null);
+        this.settings.bindProperty(Settings.BindingDirection.IN,
                 "max_items", "max_items", this.build_menu, null);
         this.build_menu();
     },
@@ -245,9 +262,12 @@ FeedApplet.prototype = {
         this.menu.addMenuItem(item);
 
         var unread_count = 0;
+        var menu_items = 0;
 
-        for (var i = 0; i < Math.min(this.reader.items.length, this.max_items);
-                i++) {
+        for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
+            if (!this.show_read_items && this.reader.items[i].read)
+                continue;
+
             var item = new FeedMenuItem(
                     this.reader.items[i],
                     this.icon_path,
@@ -259,6 +279,8 @@ FeedApplet.prototype = {
 
             if (!this.reader.items[i].read)
                 unread_count++;
+
+            menu_items++;
         }
 
         if (unread_count > 0) {
@@ -267,6 +289,10 @@ FeedApplet.prototype = {
         } else {
             this.set_applet_icon_symbolic_name("feed");
             this.set_applet_tooltip(this.reader.title);
+        }
+
+        if (0 == menu_items) {
+            this.menu.addMenuItem(new LabelMenuItem(_("No new items")));
         }
     },
 
