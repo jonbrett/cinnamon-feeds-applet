@@ -19,5 +19,14 @@
         "default" : true,
         "description" : "Show read items",
         "tooltip" : "Controls whether previously read items are displayed in the feed menu"
+    },
+    "refresh_interval": {
+        "type" : "scale",
+        "default" : 5,
+        "min" : 1,
+        "max" : 60,
+        "step" : 1,
+        "description" : "Update interval",
+        "tooltip" : "Interval between checking for new items"
     }
 }

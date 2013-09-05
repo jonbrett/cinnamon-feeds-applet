@@ -207,8 +207,6 @@ FeedApplet.prototype = {
             global.logError(e);
         }
 
-        this.timeout = 5 * 60 * 1000; /* Default 5 mins refresh period */
-
         this.init_settings();
 
         this.build_context_menu();
@@ -216,6 +214,10 @@ FeedApplet.prototype = {
 
     init_settings: function(instance_id) {
         this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "refresh_interval", "refresh_interval_mins", this.refresh,
+                null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "url", "url", this.url_changed, null);
@@ -306,7 +308,11 @@ FeedApplet.prototype = {
 
         /* Get feed data */
         if (this.reader != undefined)
-            this.reader.get()
+            this.reader.get();
+
+        /* Convert refresh interval from mins -> ms */
+        this.timeout = this.refresh_interval_mins * 60 * 1000;
+        global.log("Set timeout to " + this.timeout);
 
         /* Set the next timeout */
         this.timer_id = Mainloop.timeout_add(this.timeout,
