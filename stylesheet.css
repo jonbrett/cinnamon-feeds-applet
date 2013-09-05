@@ -2,8 +2,16 @@
     spacing: .5em;
 }
 
+.feedreader-title-image {
+    border: 2px solid white;
+    background-color: white;
+    border-radius: 2px;
+    padding: 0;
+    spacing: 0;
+
+}
+
 .feedreader-title-buttons {
-    padding-left: .5em;
     spacing: .5em;
 }
 

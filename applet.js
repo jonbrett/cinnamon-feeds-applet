@@ -114,20 +114,25 @@ FeedTitleItem.prototype = {
 
                 let image = St.TextureCache.get_default().load_uri_async(GLib.filename_to_uri(reader.image.path, null), width, height);
 
-                let tooltip = new Tooltips.Tooltip(image, this.title);
-                mainbox.add(image);
-            } catch (e) {
-                global.logError("Failed to load feed icon: " + reader.image.path);
-            }
+                let imagebox = new St.BoxLayout({
+                    style_class: 'feedreader-title-image',
+                });
+                imagebox.add(image);
 
-        } else {
-            mainbox.add(new St.Label({ text: this.title,
-                style_class: 'feedreader-title-label'
-            }));
+                mainbox.add(imagebox, { x_align: St.Align.START, x_fill: false });
+            } catch (e) {
+                global.logError("Failed to load feed icon: " + reader.image.path + ' : ' + e);
+            }
         }
+
         let buttonbox = new St.BoxLayout({
             style_class: 'feedreader-title-buttons'
         });
+
+        buttonbox.add(new St.Label({ text: this.title,
+            style_class: 'feedreader-title-label'
+        }));
+
         let button = new St.Button({ reactive: true });
         let icon = new St.Icon({
             icon_name: "web-browser-symbolic",
