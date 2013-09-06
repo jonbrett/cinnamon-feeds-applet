@@ -312,7 +312,6 @@ FeedApplet.prototype = {
 
         /* Convert refresh interval from mins -> ms */
         this.timeout = this.refresh_interval_mins * 60 * 1000;
-        global.log("Set timeout to " + this.timeout);
 
         /* Set the next timeout */
         this.timer_id = Mainloop.timeout_add(this.timeout,
