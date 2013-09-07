@@ -250,7 +250,11 @@ FeedReader.prototype = {
                 "read_list": read_list,
             };
 
-            fs.write(escape(JSON.stringify(data)), null);
+            let output = escape(JSON.stringify(data));
+            let to_write = output.length;
+            while (to_write > 0) {
+                to_write -= fs.write(output , null);
+            }
             fs.close(null);
         } catch (e) {
             global.logError('Failed to write feed file ' + e);
