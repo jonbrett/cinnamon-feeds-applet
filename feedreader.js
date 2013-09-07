@@ -104,6 +104,63 @@ FeedReader.prototype = {
                 Lang.bind(this, this._on_get_response));
     },
 
+    process_rss: function(feed) {
+        /* Get channel data */
+        this.title = String(feed..channel.title);
+        this.description = String(feed..channel.description);
+        this.link = String(feed..channel.link);
+        this.image.url = String(feed..channel.image.url);
+        this.image.width = String(feed..channel.image.width);
+        this.image.height = String(feed..channel.image.height);
+
+        /* Get item list */
+        let feed_items = feed..channel.item;
+        let new_items = new Array();
+        for (var i = 0; i < feed_items.length(); i++) {
+            /* guid is optional in RSS spec, so use link as
+             * identifier if it's not present */
+            let id = String(feed_items[i].guid);
+            if (id == '')
+                id = feed_items[i].link;
+
+            new_items.push(new FeedItem(
+                    id,
+                    String(feed_items[i].title),
+                    String(feed_items[i].link),
+                    String(feed_items[i].description),
+                    false,
+                    this));
+        }
+        return new_items;
+    },
+
+    process_atom: function(feed) {
+        /* Construct Atom XML namespace using uri from the feed in case the
+         * feed uses a non-standard uri. Normally this would be
+         * http://www.w3.org/2005/Atom */
+        let atomns = new Namespace(feed.name().uri);
+
+        /* Get channel data */
+        this.title = String(feed.atomns::title);
+        this.description = String(feed.atomns::subtitle);
+        this.link = String(feed.atomns::link.(@rel == "alternate").@href);
+        this.image.url = String(feed.atomns::logo);
+
+        /* Get items */
+        let feed_items = feed.atomns::entry;
+        let new_items = new Array();
+        for (var i = 0; i < feed_items.length(); i++) {
+            new_items.push(new FeedItem(
+                    String(feed_items[i].atomns::id),
+                    String(feed_items[i].atomns::title),
+                    String(feed_items[i].atomns::link.(@rel== "alternate").@href),
+                    String(feed_items[i].atomns::summary),
+                    false,
+                    this));
+        }
+        return new_items;
+    },
+
     _on_get_response: function(session, message) {
         if (message.status_code != 200) {
             global.log('HTTP request returned ' + message.status_code);
@@ -115,46 +172,39 @@ FeedReader.prototype = {
                     /^<\?xml\s+.*\?>/g, ''));
         } catch (e) {
             global.log('Failed to parse XML ' + e);
+            return;
         }
 
-        /* Process RSS to update channel data */
-        this.title = String(feed..channel.title);
-        this.description = String(feed..channel.description);
-        this.link = String(feed..channel.link);
-        this.image.url = String(feed..channel.image.url);
-        this.image.width = String(feed..channel.image.width);
-        this.image.height = String(feed..channel.image.height);
+        /* Determine feed type and parse */
+        if (feed.name().localName == "rss") {
+            var new_items = this.process_rss(feed);
+        } else {
+            if (feed.name().localName == "feed") {
+                var new_items = this.process_atom(feed);
+            } else {
+                global.log("Unknown feed type " + this.url);
+                return;
+            }
+        }
+
+        if (new_items.length < 1) {
+            global.log("Failed to parse feed " + this.url);
+            return
+        }
 
         /* Fetch image */
         this._fetch_image();
 
-        var rss_item = feed..channel.item;
-        var new_items = new Array();
+        /* Is this item in the old list or a new item
+         * For existing items, transfer "read" property
+         * For new items, check against the loaded historic read list */
         var new_count = 0;
-
-        for (var i = 0; i < rss_item.length(); i++) {
-            /* guid is optional in RSS spec, so use link as
-             * identifier if it's not present */
-            let id = String(rss_item[i].guid);
-            if (id == '')
-                id = rss_item[i].link;
-
-            new_items.push(new FeedItem(
-                    id,
-                    String(rss_item[i].title),
-                    String(rss_item[i].link),
-                    String(rss_item[i].description),
-                    false,
-                    this));
-
-            /* Is this item in the old list or a new item
-             * For existing items, transfer "read" property
-             * For new items, check against the loaded historic read list */
-            let existing = this._get_item_by_id(id);
+        for (var i = 0; i < new_items.length; i++) {
+            let existing = this._get_item_by_id(new_items[i].id);
             if (existing != null) {
                 new_items[i].read = existing.read
             } else {
-                if (this._is_in_read_list(id))
+                if (this._is_in_read_list(new_items[i].id))
                     new_items[i].read = true;
                 new_count++;
             }
@@ -162,7 +212,7 @@ FeedReader.prototype = {
 
         /* Were there any new items? */
         if (new_count > 0) {
-            global.log("Fetched " + new_count + " new items (" + new_items.length + " total) from " + this.url);
+            global.log("Fetched " + new_count + " new items from " + this.url);
             this.items = new_items;
             this.callbacks.onUpdate();
         }
