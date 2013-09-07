@@ -1,3 +1,8 @@
+0.5
+===
+- Add support for atom feeds [Issue #4]
+- Fix error with downloading large feed images
+
 0.4
 ===
 - Download and display feed title image (where available) [Issue #2]
