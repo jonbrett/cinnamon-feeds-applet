@@ -322,8 +322,11 @@ FeedReader.prototype = {
             let fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 
-            fs.write(message.response_body.get_chunk(0).get_data(), null,
-                    message.response_body.length);
+            var to_write = message.response_body.length;
+            while (to_write > 0) {
+                to_write -= fs.write(message.response_body.get_chunk(message.response_body.length - to_write).get_data(),
+                        null, to_write);
+            }
             fs.close(null);
 
             this.image.path = file.get_path();
