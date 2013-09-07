@@ -20,6 +20,9 @@
 
 const UUID = "feeds@jonbrettdev.wordpress.com"
 
+const FEED_IMAGE_HEIGHT_MAX = 100;
+const FEED_IMAGE_WIDTH_MAX = 200;
+
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
 const Applet = imports.ui.applet;
@@ -118,16 +121,10 @@ FeedTitleItem.prototype = {
         /* Use feed image where available for title */
         if (reader.image.path != undefined) {
             try {
-                if (reader.image.height != undefined)
-                    var height = reader.image.height;
-                else
-                    var height = 48;
-                if (reader.image.width != undefined)
-                    var width = reader.image.width;
-                else
-                    var width = 48;
-
-                let image = St.TextureCache.get_default().load_uri_async(GLib.filename_to_uri(reader.image.path, null), width, height);
+                let image = St.TextureCache.get_default().load_uri_async(
+                        GLib.filename_to_uri(reader.image.path, null),
+                        FEED_IMAGE_WIDTH_MAX,
+                        FEED_IMAGE_HEIGHT_MAX);
 
                 let imagebox = new St.BoxLayout({
                     style_class: 'feedreader-title-image',
