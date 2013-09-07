@@ -22,6 +22,7 @@ const UUID = "feeds@jonbrettdev.wordpress.com"
 
 const FEED_IMAGE_HEIGHT_MAX = 100;
 const FEED_IMAGE_WIDTH_MAX = 200;
+const TOOLTIP_WIDTH = 400.0;
 
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
@@ -87,6 +88,15 @@ FeedMenuItem.prototype = {
             box.add(new St.Icon({ gicon: fi, icon_size: 16, icon_type: St.IconType.SYMBOLIC, style_class: 'popup-menu-icon' }));
 
         box.add(new St.Label({ text: item.title, style_class: 'feedreader-item-label' }));
+
+        var desc = item.description;
+        let tooltip = new Tooltips.Tooltip(this.actor, desc);
+
+        /* Some hacking of the underlying tooltip ClutterText to set wrapping
+         * etc */
+        tooltip._tooltip.get_clutter_text().set_width(TOOLTIP_WIDTH);
+        tooltip._tooltip.get_clutter_text().set_line_alignment(0);
+        tooltip._tooltip.get_clutter_text().set_line_wrap(true);
 
         this.addActor(box);
     },

@@ -127,7 +127,7 @@ FeedReader.prototype = {
                     id,
                     String(feed_items[i].title),
                     String(feed_items[i].link),
-                    String(feed_items[i].description),
+                    html2text(String(feed_items[i].description)),
                     false,
                     this));
         }
@@ -154,7 +154,7 @@ FeedReader.prototype = {
                     String(feed_items[i].atomns::id),
                     String(feed_items[i].atomns::title),
                     String(feed_items[i].atomns::link.(@rel== "alternate").@href),
-                    String(feed_items[i].atomns::summary),
+                    html2text(String(feed_items[i].atomns::summary)),
                     false,
                     this));
         }
@@ -357,6 +357,10 @@ FeedReader.prototype = {
         return false;
     },
 };
+
+function html2text(html) {
+    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '');
+}
 
 function sanitize_url(url) {
     return url.replace(/.*:\/\//, '').replace(/\//g,'--');
