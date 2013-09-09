@@ -69,11 +69,10 @@ function FeedReader() {
 
 FeedReader.prototype = {
 
-    _init: function(url, path, max_item, callbacks) {
+    _init: function(url, path, callbacks) {
 
         this.url = url;
         this.path = path;
-        this.max_item = max_item;
         this.callbacks = callbacks;
 
         /* Feed data */

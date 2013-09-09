@@ -2,8 +2,8 @@
     "url": {
         "type" : "entry",
         "default" : "http://fxfeeds.mozilla.com/en-US/firefox/headlines.xml",
-        "description" : "Feed URL",
-        "tooltip" : "Enter the URL of a valid RSS feed"
+        "description" : "Feed URL(s)",
+        "tooltip" : "Enter the URLs of a valid RSS/Atom feed. Separate multiple URLs with spaces"
     },
     "max_items": {
             "type" : "scale",

@@ -133,6 +133,7 @@ FeedTitleItem.prototype = {
         this.title = reader.title;
         this.url = reader.link;
         this.owner = owner;
+        this.reader = reader;
 
         let container = new St.BoxLayout();
         let mainbox = new St.BoxLayout({
@@ -189,7 +190,7 @@ FeedTitleItem.prototype = {
         button.set_child(icon);
         button.connect('clicked', Lang.bind(this, function(button, event) {
             this.owner.menu.close();
-            this.owner.reader.mark_all_items_read();
+            this.reader.mark_all_items_read();
             this.owner.build_menu();
         }));
         let tooltip = new Tooltips.Tooltip(button, _("Mark all as read"));
@@ -260,13 +261,17 @@ FeedApplet.prototype = {
     },
 
     url_changed: function() {
-        this.reader = new FeedReader.FeedReader(
-                this.url,
-                '~/.cinnamon/' + UUID + '/' + this.instance_id,
-                5,
-                {
-                    'onUpdate' : Lang.bind(this, this.on_update)
-                });
+        let url_list = this.url.replace(/\s+/g, " ").replace(/\s*$/, '').replace(/^\s*/, '').split(" ");
+        this.reader = new Array();
+
+        for (var i in url_list) {
+            this.reader[i] = new FeedReader.FeedReader(
+                    url_list[i],
+                    '~/.cinnamon/' + UUID + '/' + this.instance_id,
+                    {
+                        'onUpdate' : Lang.bind(this, this.on_update)
+                    });
+        }
         this.build_menu();
         this.refresh();
     },
@@ -279,42 +284,58 @@ FeedApplet.prototype = {
 
         this.menu.removeAll();
 
-        var item = new FeedTitleItem(this.reader, this);
-        this.menu.addMenuItem(item);
+        let applet_has_unread = false;
+        let applet_tooltip = "";
 
-        var unread_count = 0;
-        var menu_items = 0;
-
-        for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
-            if (!this.show_read_items && this.reader.items[i].read)
+        for (var r = 0; r < this.reader.length; r++) {
+            if (this.reader[r] == undefined)
                 continue;
 
-            var item = new FeedMenuItem(
-                    this.reader.items[i],
-                    this.icon_path,
-                    Lang.bind(this, this.on_update));
-            item.connect("activate", function(actor, event) {
-                actor.read_item();
-            });
+            let item = new FeedTitleItem(this.reader[r], this);
             this.menu.addMenuItem(item);
 
-            if (!this.reader.items[i].read)
-                unread_count++;
+            let unread_count = 0;
+            let menu_items = 0;
 
-            menu_items++;
+            for (var i = 0; i < this.reader[r].items.length && menu_items < this.max_items; i++) {
+                if (!this.show_read_items && this.reader[r].items[i].read)
+                    continue;
+
+                let item = new FeedMenuItem(
+                        this.reader[r].items[i],
+                        this.icon_path,
+                        Lang.bind(this, this.on_update));
+                item.connect("activate", function(actor, event) {
+                    actor.read_item();
+                });
+                this.menu.addMenuItem(item);
+
+                if (!this.reader[r].items[i].read)
+                    unread_count++;
+
+                menu_items++;
+            }
+
+            if (0 == menu_items)
+                this.menu.addMenuItem(new LabelMenuItem(_("No new items")));
+
+            /* Append to applet tooltip */
+            if (r != 0)
+                applet_tooltip += '\n';
+            if (unread_count > 0) {
+                applet_tooltip += this.reader[r].title + ' [' + unread_count + ']';
+                applet_has_unread = true;
+            } else {
+                applet_tooltip += this.reader[r].title;
+            }
         }
 
-        if (unread_count > 0) {
+        if (applet_has_unread)
             this.set_applet_icon_symbolic_name("feed-new");
-            this.set_applet_tooltip(this.reader.title + ' [' + unread_count + ']');
-        } else {
+        else
             this.set_applet_icon_symbolic_name("feed");
-            this.set_applet_tooltip(this.reader.title);
-        }
 
-        if (0 == menu_items) {
-            this.menu.addMenuItem(new LabelMenuItem(_("No new items")));
-        }
+        this.set_applet_tooltip(applet_tooltip);
     },
 
 
@@ -326,8 +347,10 @@ FeedApplet.prototype = {
         }
 
         /* Get feed data */
-        if (this.reader != undefined)
-            this.reader.get();
+        for (var i = 0; i < this.reader.length; i++) {
+            if (this.reader[i] != undefined)
+                this.reader[i].get();
+        }
 
         /* Convert refresh interval from mins -> ms */
         this.timeout = this.refresh_interval_mins * 60 * 1000;
