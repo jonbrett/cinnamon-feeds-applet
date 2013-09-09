@@ -22,3 +22,13 @@
 .feedreader-item {
     spacing: 1em;
 }
+
+/* Cinnamon tooltips use id="Tooltip", but the default theme (and most others
+ * use text-align: center. Tooltips created for feedreader items contain lots
+ * of text so left-alignment makes for better readability
+ * Feedreader adds the additional class="feedreader-item-tooltip" to the
+ * underlying tooltip label */
+#Tooltip.feedreader-item-tooltip {
+    text-align: left;
+}
+

@@ -22,7 +22,7 @@ const UUID = "feeds@jonbrettdev.wordpress.com"
 
 const FEED_IMAGE_HEIGHT_MAX = 100;
 const FEED_IMAGE_WIDTH_MAX = 200;
-const TOOLTIP_WIDTH = 400.0;
+const TOOLTIP_WIDTH = 500.0;
 
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
@@ -87,16 +87,28 @@ FeedMenuItem.prototype = {
         if (fi != undefined)
             box.add(new St.Icon({ gicon: fi, icon_size: 16, icon_type: St.IconType.SYMBOLIC, style_class: 'popup-menu-icon' }));
 
-        box.add(new St.Label({ text: item.title, style_class: 'feedreader-item-label' }));
+        box.add(new St.Label({
+            text: FeedReader.html2text(item.title),
+            style_class: 'feedreader-item-label'
+        }));
 
-        var desc = item.description;
-        let tooltip = new Tooltips.Tooltip(this.actor, desc);
+        let tooltip = new Tooltips.Tooltip(this.actor,
+                FeedReader.html2text(item.description));
 
-        /* Some hacking of the underlying tooltip ClutterText to set wrapping
-         * etc */
-        tooltip._tooltip.get_clutter_text().set_width(TOOLTIP_WIDTH);
-        tooltip._tooltip.get_clutter_text().set_line_alignment(0);
-        tooltip._tooltip.get_clutter_text().set_line_wrap(true);
+        /* Some hacking of the underlying tooltip ClutterText to set wrapping,
+         * format, etc */
+        try {
+            tooltip._tooltip.style_class = 'feedreader-item-tooltip';
+            tooltip._tooltip.get_clutter_text().set_width(TOOLTIP_WIDTH);
+            tooltip._tooltip.get_clutter_text().set_line_alignment(0);
+            tooltip._tooltip.get_clutter_text().set_line_wrap(true);
+            tooltip._tooltip.get_clutter_text().set_markup(
+                    FeedReader.html2pango(item.description));
+        } catch (e) {
+            /* If we couldn't tweak the tooltip format this is likely because
+             * the underlying implementation has changed. Don't issue any
+             * failure here */
+        }
 
         this.addActor(box);
     },
