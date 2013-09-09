@@ -127,7 +127,7 @@ FeedReader.prototype = {
                     id,
                     String(feed_items[i].title),
                     String(feed_items[i].link),
-                    html2text(String(feed_items[i].description)),
+                    String(feed_items[i].description),
                     false,
                     this));
         }
@@ -154,7 +154,7 @@ FeedReader.prototype = {
                     String(feed_items[i].atomns::id),
                     String(feed_items[i].atomns::title),
                     String(feed_items[i].atomns::link.(@rel== "alternate").@href),
-                    html2text(String(feed_items[i].atomns::summary)),
+                    String(feed_items[i].atomns::summary),
                     false,
                     this));
         }
@@ -358,8 +358,43 @@ FeedReader.prototype = {
     },
 };
 
+/* Convert html to plaintext */
 function html2text(html) {
     return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '');
+}
+
+/* Convert html to (basic) Gnome Pango markup */
+function html2pango(html) {
+    let ret = html;
+    let esc_open = '-@~]';
+    let esc_close= ']~@-';
+
+    /* </p> <br/> --> newline */
+    ret = ret.replace('<br/>', '\n').replace('</p>','\n');
+
+    /* Headings --> <b> + 2*newline */
+    ret = ret.replace(/<h[0-9]>/g, esc_open+'span weight="bold"'+esc_close);
+    ret = ret.replace(/<\/h[0-9]>\s*/g, esc_open+'/span'+esc_close+'\n\n');
+
+    /* <strong> -> <b> */
+    ret = ret.replace('<strong>', esc_open+'b'+esc_close);
+    ret = ret.replace('</strong>', esc_open+'/b'+esc_close);
+
+    /* <i> -> <i> */
+    ret = ret.replace('<i>', esc_open+'i'+esc_close);
+    ret = ret.replace('</i>', esc_open+'/i'+esc_close);
+
+    /* Strip remaining tags */
+    ret = ret.replace(/<.*?>/g, '');
+
+    /* Replace escaped <, > with actual angle-brackets */
+    let re1 = new RegExp(esc_open, 'g');
+    let re2 = new RegExp(esc_close, 'g');
+    ret = ret.replace(re1, '<').replace(re2, '>');
+
+    global.log('Pango: ' + ret);
+
+    return ret;
 }
 
 function sanitize_url(url) {
