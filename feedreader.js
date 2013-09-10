@@ -391,8 +391,6 @@ function html2pango(html) {
     let re2 = new RegExp(esc_close, 'g');
     ret = ret.replace(re1, '<').replace(re2, '>');
 
-    global.log('Pango: ' + ret);
-
     return ret;
 }
 
