@@ -184,7 +184,7 @@ FeedTitleItem.prototype = {
         buttonbox.add(button);
 
         button = new St.Button({ reactive: true });
-        icon = new St.Icon({ icon_name: "edit-clear-symbolic",
+        icon = new St.Icon({ icon_name: "object-select-symbolic",
             style_class: 'popup-menu-icon'
         });
         button.set_child(icon);
@@ -252,12 +252,23 @@ FeedApplet.prototype = {
 
     build_context_menu: function() {
         var s = new Applet.MenuItem(
+                _("Mark all read"),
+                "object-select-symbolic",
+                Lang.bind(this, function() {
+                    for (var i = 0; i < this.reader.length; i++)
+                        this.reader[i].mark_all_items_read();
+                    this.build_menu();
+                }));
+        s.icon.icon_type = St.IconType.SYMBOLIC;
+        this._applet_context_menu.addMenuItem(s);
+
+        s = new Applet.MenuItem(
                 _("Settings"),
                 Gtk.STOCK_EDIT,
                 Lang.bind(this, function() {
                     Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
                 }));
-      this._applet_context_menu.addMenuItem(s);
+        this._applet_context_menu.addMenuItem(s);
     },
 
     url_changed: function() {
