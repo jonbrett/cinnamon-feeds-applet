@@ -363,7 +363,7 @@ FeedReader.prototype = {
      * Log error state and report to application
      */
     on_error: function(msg, details) {
-        global.logError("Feedreader (+" + this.url +"): " + msg);
+        global.logError("Feedreader (" + this.url +"): " + msg);
 
         this.error = true;
         this.error_messsage = msg;
