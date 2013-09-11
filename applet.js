@@ -262,6 +262,15 @@ FeedApplet.prototype = {
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
+        var s = new Applet.MenuItem(
+                _("Reload"),
+                "view-refresh-symbolic",
+                Lang.bind(this, function() {
+                    this.refresh();
+                }));
+        s.icon.icon_type = St.IconType.SYMBOLIC;
+        this._applet_context_menu.addMenuItem(s);
+
         s = new Applet.MenuItem(
                 _("Settings"),
                 Gtk.STOCK_EDIT,
