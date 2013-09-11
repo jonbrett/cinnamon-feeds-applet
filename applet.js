@@ -142,7 +142,7 @@ FeedTitleItem.prototype = {
         });
 
         /* Use feed image where available for title */
-        if (reader.image.path != undefined) {
+        if (reader.image.path != undefined && owner.show_feed_image == true) {
             try {
                 let image = St.TextureCache.get_default().load_uri_async(
                         GLib.filename_to_uri(reader.image.path, null),
@@ -247,6 +247,8 @@ FeedApplet.prototype = {
                 "show_read_items", "show_read_items", this.build_menu, null);
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "max_items", "max_items", this.build_menu, null);
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_feed_image", "show_feed_image", this.build_menu, null);
         this.build_menu();
     },
 
