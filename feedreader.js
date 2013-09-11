@@ -74,6 +74,7 @@ FeedReader.prototype = {
         this.url = url;
         this.path = path;
         this.callbacks = callbacks;
+        this.error = false;
 
         /* Feed data */
         this.title = "";
@@ -98,6 +99,9 @@ FeedReader.prototype = {
 
     get: function() {
         let msg = Soup.Message.new('GET', this.url);
+
+        /* Reset error state */
+        this.error = false;
 
         this.session.queue_message(msg,
                 Lang.bind(this, this._on_get_response));
@@ -162,16 +166,15 @@ FeedReader.prototype = {
 
     _on_get_response: function(session, message) {
         if (message.status_code != 200) {
-            global.log('HTTP request returned ' + message.status_code);
-            return;
+            return this.on_error('Unable to download feed',
+                    'Received HTTP ' + message.status_code + ' from ' + this.url);
         }
 
         try {
             var feed = new XML(message.response_body.data.replace(
                     /^<\?xml\s+.*\?>/g, ''));
         } catch (e) {
-            global.log('Failed to parse XML ' + e);
-            return;
+            return this.on_error('Failed to parse feed XML', e);
         }
 
         /* Determine feed type and parse */
@@ -181,14 +184,12 @@ FeedReader.prototype = {
             if (feed.name().localName == "feed") {
                 var new_items = this.process_atom(feed);
             } else {
-                global.log("Unknown feed type " + this.url);
-                return;
+                return this.on_error("Unknown feed type", this.url);
             }
         }
 
         if (new_items.length < 1) {
-            global.log("Failed to parse feed " + this.url);
-            return
+            return this.on_error("Unable to read feed contents", this.url);
         }
 
         /* Fetch image */
@@ -215,6 +216,7 @@ FeedReader.prototype = {
             this.items = new_items;
             this.callbacks.onUpdate();
         }
+        return 0;
     },
 
     mark_all_items_read: function() {
@@ -311,7 +313,7 @@ FeedReader.prototype = {
 
     _on_img_response: function(session, message) {
         if (message.status_code != 200) {
-            global.log('HTTP request returned ' + message.status_code);
+            global.logError('HTTP request for ' + this.url + ' returned ' + message.status_code);
             return;
         }
 
@@ -354,6 +356,23 @@ FeedReader.prototype = {
                 return true;
         }
         return false;
+    },
+
+    /* Fatal error handler
+     *
+     * Log error state and report to application
+     */
+    on_error: function(msg, details) {
+        global.logError("Feedreader (+" + this.url +"): " + msg);
+
+        this.error = true;
+        this.error_messsage = msg;
+        this.error_details = details;
+
+        if (this.callbacks.onError)
+            this.callbacks.onError(this, msg, details);
+
+        return 1;
     },
 };
 
