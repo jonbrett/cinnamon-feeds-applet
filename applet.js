@@ -275,10 +275,11 @@ FeedApplet.prototype = {
 
         s = new Applet.MenuItem(
                 _("Settings"),
-                Gtk.STOCK_EDIT,
+                "emblem-system-symbolic",
                 Lang.bind(this, function() {
                     Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
                 }));
+        s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
     },
 
