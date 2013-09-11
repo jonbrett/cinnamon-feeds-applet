@@ -1,3 +1,12 @@
+0.6
+===
+- Multiple feed support [Issue #1]
+- Add tooltips with item summary [Issue #11]
+- Add context menu items to refresh and mark all items read [Issue #13]
+- Make showing feed menu images an optional setting [Issue #14]
+- Report feed errors directly in menu [Issue #12]
+- Use symbolic icons for settings icon
+
 0.5
 ===
 - Add support for atom feeds [Issue #4]
