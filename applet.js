@@ -49,10 +49,14 @@ function LabelMenuItem() {
 LabelMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (text, params) {
+    _init: function (text, tooltip, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
-        this.addActor(new St.Label({ text: text }));
+        let label = new St.Label({ text: text });
+        this.addActor(label);
+
+        if (this.tooltip != '')
+            new Tooltips.Tooltip(this.actor, tooltip);
     },
 };
 
@@ -292,7 +296,8 @@ FeedApplet.prototype = {
                     url_list[i],
                     '~/.cinnamon/' + UUID + '/' + this.instance_id,
                     {
-                        'onUpdate' : Lang.bind(this, this.on_update)
+                        'onUpdate' : Lang.bind(this, this.on_update),
+                        'onError' : Lang.bind(this, this.on_error)
                     });
         }
         this.build_menu();
@@ -300,6 +305,11 @@ FeedApplet.prototype = {
     },
 
     on_update: function() {
+        this.build_menu();
+    },
+
+    on_error: function(reader, message, full_message) {
+        /* Just build the menu - this will interrogate the reader for errors */
         this.build_menu();
     },
 
@@ -319,6 +329,14 @@ FeedApplet.prototype = {
 
             let unread_count = 0;
             let menu_items = 0;
+
+            /* Display error message for this reader and continue */
+            if (this.reader[r].error) {
+                let err_label = new LabelMenuItem(this.reader[r].error_messsage,
+                        this.reader[r].error_details);
+                this.menu.addMenuItem(err_label);
+                continue;
+            }
 
             for (var i = 0; i < this.reader[r].items.length && menu_items < this.max_items; i++) {
                 if (!this.show_read_items && this.reader[r].items[i].read)
@@ -340,7 +358,8 @@ FeedApplet.prototype = {
             }
 
             if (0 == menu_items)
-                this.menu.addMenuItem(new LabelMenuItem(_("No new items")));
+                this.menu.addMenuItem(new LabelMenuItem(_("No new items"), ''));
+
 
             /* Append to applet tooltip */
             if (r != 0)
