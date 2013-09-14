@@ -21,6 +21,7 @@
 
 .feedreader-item {
     spacing: 1em;
+    padding-left: 0em;
 }
 
 /* Cinnamon tooltips use id="Tooltip", but the default theme (and most others

@@ -73,35 +73,22 @@ function FeedMenuItem() {
 }
 
 FeedMenuItem.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+    __proto__: Applet.MenuItem.prototype,
 
-    _init: function (item, icon_path, on_update, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
-
-        this._on_update = on_update;
+    _init: function (item, params) {
         this.item = item;
-
         if (this.item.read)
-            var icon_filename = icon_path +  'feed-symbolic.svg';
+            this._icon = 'feed-symbolic';
         else
-            var icon_filename = icon_path + 'feed-new-symbolic.svg';
+            this._icon = 'feed-new-symbolic';
 
-        var fi = undefined;
-        try {
-            fi = new Gio.FileIcon({ file: Gio.file_new_for_path(icon_filename) });
-        } catch (e) {
-            global.logError('Failed to load icon file ' + icon_filename + ' : ' + e);
-        }
-
-        let box = new St.BoxLayout({ style_class: 'feedreader-item' });
-
-        if (fi != undefined)
-            box.add(new St.Icon({ gicon: fi, icon_size: 16, icon_type: St.IconType.SYMBOLIC, style_class: 'popup-menu-icon' }));
-
-        box.add(new St.Label({
-            text: FeedReader.html2text(item.title),
-            style_class: 'feedreader-item-label'
-        }));
+        Applet.MenuItem.prototype._init.call(this,
+                FeedReader.html2text(item.title),
+                this._icon,
+                Lang.bind(this, function() {
+                    this.read_item();
+                }));
+        this.icon.icon_type = St.IconType.SYMBOLIC;
 
         this.tooltip = new Tooltips.Tooltip(this.actor,
                 FeedReader.html2text(item.description));
@@ -131,7 +118,17 @@ FeedMenuItem.prototype = {
 
     read_item: function() {
         this.item.open();
-        this._on_update();
+
+        /* Update icon */
+        this.removeActor(this.label);
+        this.removeActor(this.icon);
+        this._icon = 'feed-symbolic';
+        this.icon = new St.Icon({ icon_name: this._icon,
+                icon_type: St.IconType.SYMBOLIC,
+                style_class: 'popup-menu-icon' });
+
+        this.addActor(this.icon);
+        this.addActor(this.label);
     },
 };
 
@@ -141,10 +138,10 @@ function FeedTitleItem() {
 }
 
 FeedTitleItem.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+    __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
     _init: function (reader, owner, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {reactive: false});
+        PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, reader.title);
 
         this.title = reader.title;
         this.url = reader.link;
@@ -214,7 +211,28 @@ FeedTitleItem.prototype = {
 
         mainbox.add(buttonbox);
         container.add(mainbox);
-        this.addActor(container);
+
+        this.removeActor(this.label);
+        this.removeActor(this._triangle);
+
+        this.addActor(new St.Label());
+        this.addActor(container, {align: St.Align.START});
+        this.addActor(this._triangle, {align: St.Align.END, span: -1});
+
+        let menu_items = 0;
+        let unread_count = 0;
+        for (var i = 0; i < this.reader.items.length; i++) {
+            let item = new FeedMenuItem(this.reader.items[i]);
+            item.connect("activate", function(actor, event) {
+                actor.read_item();
+            });
+            this.menu.addMenuItem(item);
+
+            if (!this.reader.items[i].read)
+                unread_count++;
+
+            menu_items++;
+        }
     },
 };
 
@@ -388,6 +406,7 @@ FeedApplet.prototype = {
     build_menu: function() {
 
         this.menu.removeAll();
+        this.feed_title_items = new Array();
 
         let applet_has_unread = false;
         let applet_tooltip = "";
@@ -400,8 +419,8 @@ FeedApplet.prototype = {
             if (this.reader[r] == undefined)
                 continue;
 
-            let item = new FeedTitleItem(this.reader[r], this);
-            this.menu.addMenuItem(item);
+            this.feed_title_items[r] = new FeedTitleItem(this.reader[r], this);
+            this.menu.addMenuItem(this.feed_title_items[r]);
 
             let unread_count = 0;
             let menu_items = 0;
@@ -417,15 +436,6 @@ FeedApplet.prototype = {
             for (var i = 0; i < this.reader[r].items.length && menu_items < this.max_items; i++) {
                 if (!this.show_read_items && this.reader[r].items[i].read)
                     continue;
-
-                let item = new FeedMenuItem(
-                        this.reader[r].items[i],
-                        this.icon_path,
-                        Lang.bind(this, this.on_update));
-                item.connect("activate", function(actor, event) {
-                    actor.read_item();
-                });
-                this.menu.addMenuItem(item);
 
                 if (!this.reader[r].items[i].read)
                     unread_count++;
@@ -479,6 +489,9 @@ FeedApplet.prototype = {
 
     on_applet_clicked: function(event) {
         this.menu.toggle();
+        for (var i = 0; i < this.feed_title_items.length; i++) {
+            this.feed_title_items[i].menu.open()
+        }
     }
 };
 
