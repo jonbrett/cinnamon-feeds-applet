@@ -133,32 +133,58 @@ FeedMenuItem.prototype = {
 };
 
 /* Menu item for displaying the feed title*/
-function FeedTitleItem() {
+function FeedDisplayMenuItem() {
     this._init.apply(this, arguments);
 }
 
-FeedTitleItem.prototype = {
+FeedDisplayMenuItem.prototype = {
     __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
     _init: function (reader, owner, params) {
         PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, reader.title);
 
-        this.title = reader.title;
-        this.url = reader.link;
         this.owner = owner;
         this.reader = reader;
 
-        let container = new St.BoxLayout();
-        let mainbox = new St.BoxLayout({
+        /* Create initial layout for menu title We wrap the main titlebox in a
+         * container in order to avoid excessive spacing caused by the
+         * mainbox vertical layout */
+        this.mainbox = new St.BoxLayout({
             style_class: 'feedreader-title',
             vertical: true
         });
+        this.mainbox.add(new St.Label({text:_("_Loading")}));
+        let container = new St.BoxLayout();
+        container.add(this.mainbox);
+
+        this.statusbox = new St.BoxLayout({
+            style_class: 'feedreader-status'
+        });
+
+        /* Remove/re-add PopupSubMenuMenuItem actors to insert our own actors
+         * in place of the the regular label */
+        this.removeActor(this.label);
+        this.removeActor(this._triangle);
+        this.addActor(this.statusbox);
+        this.addActor(container);
+        this.addActor(this._triangle, {align: St.Align.END});
+
+        this.update();
+    },
+
+    /* Rebuild the feed title, status, items from the feed reader */
+    update: function() {
+
+        /* Clear existing actors */
+        this.statusbox.destroy_all_children();
+        this.mainbox.destroy_all_children();
 
         /* Use feed image where available for title */
-        if (reader.image.path != undefined && owner.show_feed_image == true) {
+        if (this.reader.image.path != undefined &&
+                this.owner.show_feed_image == true) {
             try {
                 let image = St.TextureCache.get_default().load_uri_async(
-                        GLib.filename_to_uri(reader.image.path, null),
+                        GLib.filename_to_uri(this.reader.image.path, null),
                         FEED_IMAGE_WIDTH_MAX,
                         FEED_IMAGE_HEIGHT_MAX);
 
@@ -167,9 +193,9 @@ FeedTitleItem.prototype = {
                 });
                 imagebox.add(image);
 
-                mainbox.add(imagebox, { x_align: St.Align.START, x_fill: false });
+                this.mainbox.add(imagebox, { x_align: St.Align.START, x_fill: false });
             } catch (e) {
-                global.logError("Failed to load feed icon: " + reader.image.path + ' : ' + e);
+                global.logError("Failed to load feed icon: " + this.reader.image.path + ' : ' + e);
             }
         }
 
@@ -177,7 +203,7 @@ FeedTitleItem.prototype = {
             style_class: 'feedreader-title-buttons'
         });
 
-        buttonbox.add(new St.Label({ text: this.title,
+        buttonbox.add(new St.Label({ text: this.reader.title,
             style_class: 'feedreader-title-label'
         }));
 
@@ -209,15 +235,7 @@ FeedTitleItem.prototype = {
         let tooltip = new Tooltips.Tooltip(button, _("Mark all as read"));
         buttonbox.add(button);
 
-        mainbox.add(buttonbox);
-        container.add(mainbox);
-
-        this.removeActor(this.label);
-        this.removeActor(this._triangle);
-
-        this.addActor(new St.Label());
-        this.addActor(container, {align: St.Align.START});
-        this.addActor(this._triangle, {align: St.Align.END, span: -1});
+        this.mainbox.add(buttonbox);
 
         let menu_items = 0;
         let unread_count = 0;
@@ -419,7 +437,7 @@ FeedApplet.prototype = {
             if (this.reader[r] == undefined)
                 continue;
 
-            this.feed_title_items[r] = new FeedTitleItem(this.reader[r], this);
+            this.feed_title_items[r] = new FeedDisplayMenuItem(this.reader[r], this);
             this.menu.addMenuItem(this.feed_title_items[r]);
 
             let unread_count = 0;
