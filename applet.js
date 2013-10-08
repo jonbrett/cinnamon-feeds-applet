@@ -27,6 +27,7 @@ const TOOLTIP_WIDTH = 500.0;
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
 const Applet = imports.ui.applet;
+const Cinnamon = imports.gi.Cinnamon;
 const FeedReader = imports.feedreader;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -244,9 +245,16 @@ FeedApplet.prototype = {
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
+                "feed_source", "feed_source", this.feed_source_changed, null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
                 "url", "url", this.url_changed, null);
         this.url_changed();
 
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "list_file", "list_file", this.feed_list_file_changed, null);
+        this.feed_list_file_changed();
+        
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_read_items", "show_read_items", this.build_menu, null);
         this.settings.bindProperty(Settings.BindingDirection.IN,
@@ -255,7 +263,13 @@ FeedApplet.prototype = {
                 "show_feed_image", "show_feed_image", this.build_menu, null);
         this.build_menu();
     },
-
+    // called whenever a different feed source (file or list) is chosen
+    feed_source_changed: function() {
+        // just call both the file and list callback and let them figure
+        // out what to do
+        this.url_changed();
+        this.feed_list_file_changed();
+    },
     build_context_menu: function() {
         var s = new Applet.MenuItem(
                 _("Mark all read"),
@@ -277,6 +291,15 @@ FeedApplet.prototype = {
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
+        var s = new Applet.MenuItem(
+                _("Reload Feeds File"),
+                "view-refresh-symbolic",
+                Lang.bind(this, function() {
+                    this.feed_list_file_changed();
+                }));
+        s.icon.icon_type = St.IconType.SYMBOLIC;
+        this._applet_context_menu.addMenuItem(s);
+
         s = new Applet.MenuItem(
                 _("Settings"),
                 "emblem-system-symbolic",
@@ -287,8 +310,42 @@ FeedApplet.prototype = {
         this._applet_context_menu.addMenuItem(s);
     },
 
+    feed_list_file_changed: function() {
+        // if the file is not the source don't do anything
+        if (this.feed_source != 1) return;
+        let filename = this.list_file;
+        try {
+            var content = Cinnamon.get_file_contents_utf8_sync(filename);
+        } catch (e) {
+            global.logError("error while parsing file " + e);
+            return;
+        }
+        let url_list = content.split("\n");
+        global.logError("content: " + content);
+        // eliminate empty urls
+        for (var i in url_list) {
+            if (url_list[i].length == 0) {
+                url_list.splice(i--,1);
+                continue;
+            }
+            global.logError("url (from file): '" + url_list[i] + "'");
+        }
+        this.feeds_changed(url_list);
+    },
+
     url_changed: function() {
+        // if the list is not the source, don't do anything
+        global.logError("source: " + this.feed_source);
+        if (this.feed_source != 0) return;
         let url_list = this.url.replace(/\s+/g, " ").replace(/\s*$/, '').replace(/^\s*/, '').split(" ");
+        for (var i in url_list) {
+            global.logError("url: '" + url_list[i] + "'");
+        }
+        this.feeds_changed(url_list);
+    },
+
+    // called when feeds have been added or removed
+    feeds_changed: function(url_list) {
         this.reader = new Array();
 
         for (var i in url_list) {
@@ -379,7 +436,6 @@ FeedApplet.prototype = {
 
         this.set_applet_tooltip(applet_tooltip);
     },
-
 
     refresh: function() {
         /* Remove any previous timeout */
