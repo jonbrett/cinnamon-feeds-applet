@@ -247,7 +247,7 @@ FeedApplet.prototype = {
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                "feed_source", "feed_source", this.feed_source_changed, null);
+                "use_list_file", "use_list_file", this.feed_source_changed, null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "url", "url", this.url_changed, null);
@@ -314,7 +314,7 @@ FeedApplet.prototype = {
 
     feed_list_file_changed: function() {
         // if the file is not the source don't do anything
-        if (this.feed_source != 1) return;
+        if (! this.use_list_file) return;
         let filename = this.list_file;
         let url_list = [];
         try {
@@ -340,8 +340,7 @@ FeedApplet.prototype = {
 
     url_changed: function() {
         // if the list is not the source, don't do anything
-        global.logError("source: " + this.feed_source);
-        if (this.feed_source != 0) return;
+        if (this.use_list_file) return;
         let url_list = this.url.replace(/\s+/g, " ").replace(/\s*$/, '').replace(/^\s*/, '').split(" ");
         for (var i in url_list) {
             global.logError("url: '" + url_list[i] + "'");
