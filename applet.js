@@ -228,6 +228,8 @@ FeedApplet.prototype = {
             this.menu = new Applet.AppletPopupMenu(this, orientation);
             this.menuManager.addMenu(this.menu);
 
+            this.feed_file_error = false;
+
         } catch (e) {
             global.logError(e);
         }
@@ -314,21 +316,24 @@ FeedApplet.prototype = {
         // if the file is not the source don't do anything
         if (this.feed_source != 1) return;
         let filename = this.list_file;
+        let url_list = [];
         try {
             var content = Cinnamon.get_file_contents_utf8_sync(filename);
+            url_list = content.split("\n");
         } catch (e) {
             global.logError("error while parsing file " + e);
-            return;
+            this.feed_file_error = true;
         }
-        let url_list = content.split("\n");
-        global.logError("content: " + content);
+        
         // eliminate empty urls
+        // this has to be done because some text editors automatically
+        // add an empty line at the end of a file and empty URLS cause the
+        // reader to get hickups
         for (var i in url_list) {
             if (url_list[i].length == 0) {
                 url_list.splice(i--,1);
                 continue;
             }
-            global.logError("url (from file): '" + url_list[i] + "'");
         }
         this.feeds_changed(url_list);
     },
@@ -377,6 +382,10 @@ FeedApplet.prototype = {
         let applet_has_unread = false;
         let applet_tooltip = "";
 
+        if (this.feed_file_error) {
+            this.menu.addAction("Could not read feed list file!", null);
+        }
+        
         for (var r = 0; r < this.reader.length; r++) {
             if (this.reader[r] == undefined)
                 continue;
