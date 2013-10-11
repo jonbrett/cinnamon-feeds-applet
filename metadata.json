@@ -3,9 +3,10 @@
     "name": "Feeds Reader",
     "description": "Displays RSS news feeds",
     "original-authors": [
-        "jonbrett.dev@gmail.com"
+        "jonbrett.dev@gmail.com",
+        "lamouletrescool@gmail.com"
     ],
-    "version": 0.6,
+    "version": 0.7,
     "url": "jonbrettdev.wordpress.com",
     "max-instances": "10"
 }

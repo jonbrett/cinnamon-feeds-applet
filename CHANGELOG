@@ -1,3 +1,7 @@
+0.7
+===
+- Add settings to load feed URLs from a file [Issue #20 and #21]
+
 0.6
 ===
 - Multiple feed support [Issue #1]
