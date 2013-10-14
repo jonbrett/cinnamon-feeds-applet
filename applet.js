@@ -272,7 +272,8 @@ FeedDisplayMenuItem.prototype = {
 
         this.mainbox.add(buttonbox);
 
-        for (var i = 0; i < this.reader.items.length; i++) {
+        let menu_items = 0;
+        for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
             if (this.reader.items[i].read && !this.show_read_items)
                 continue;
 
@@ -281,6 +282,8 @@ FeedDisplayMenuItem.prototype = {
                 actor.read_item();
             });
             this.menu.addMenuItem(item);
+
+            menu_items++;
         }
 
         this.owner.update();
@@ -337,6 +340,13 @@ FeedApplet.prototype = {
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_read_items", "show_read_items", this.update_params, null);
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "max_items", "max_items", this.update_params, null);
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_feed_image", "show_feed_image", this.update_params, null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
                 "use_list_file", "use_list_file", this.feed_source_changed, null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
@@ -346,13 +356,6 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "list_file", "list_file", this.feed_list_file_changed, null);
         this.feed_list_file_changed();
-        
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "show_read_items", "show_read_items", this.update_params, null);
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "max_items", "max_items", this.update_params, null);
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "show_feed_image", "show_feed_image", this.update_params, null);
     },
     // called whenever a different feed source (file or list) is chosen
     feed_source_changed: function() {
