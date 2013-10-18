@@ -178,11 +178,22 @@ FeedDisplayMenuItem.prototype = {
         this.removeActor(this._triangle);
         this.addActor(this.statusbox);
         this.addActor(container);
-        this.addActor(this._triangle, {align: St.Align.END});
+        this.addActor(this._triangle, {align: St.Align.START});
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
         this.update();
+    },
+
+    _getPreferredWidth: function(actor, forHeight, alloc) {
+        PopupMenu.PopupSubMenuMenuItem.prototype._getPreferredWidth.call(this, actor, forHeight, alloc);
+
+        /* If the submenu's natural width is greater than the title's natural
+         * width, use it instead. This avoids lots of nasty menu resizing when
+         * we open/close submenus */
+        let [sub_min, sub_natural] = this.menu.actor.get_preferred_width(-1);
+        if (alloc.natural_size < sub_natural)
+            alloc.min_size = alloc.natural_size = sub_natural;
     },
 
     update_params: function(params) {
