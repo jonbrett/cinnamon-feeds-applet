@@ -180,6 +180,8 @@ FeedDisplayMenuItem.prototype = {
         this.addActor(container);
         this.addActor(this._triangle, {align: St.Align.END});
 
+        this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
+
         this.update();
     },
 
@@ -295,6 +297,14 @@ FeedDisplayMenuItem.prototype = {
 
         this.menu.addMenuItem(new LabelMenuItem(
                     message, full_message));
+    },
+
+    on_open_state_changed: function(menu, open) {
+        this.show = open;
+        if (open)
+            this.owner.toggle_submenus(this);
+        else
+            this.owner.toggle_submenus(null);
     },
 };
 
@@ -451,6 +461,11 @@ FeedApplet.prototype = {
                         show_feed_image: this.show_feed_image
                     });
             this.menu.addMenuItem(this.feeds[i]);
+
+            if (i == 0)
+                this.feeds[i].show = true;
+            else
+                this.feeds[i].show = false;
         }
         this.refresh();
     },
@@ -510,7 +525,23 @@ FeedApplet.prototype = {
 
     on_applet_clicked: function(event) {
         this.menu.toggle();
-    }
+        this.toggle_submenus(null);
+    },
+
+    toggle_submenus: function(feed_to_show) {
+        for (i in this.feeds) {
+            if (feed_to_show != null && feed_to_show != this.feeds[i]) {
+                this.feeds[i].show = false;
+            }
+
+            if (this.feeds[i].show) {
+                this.feeds[i].menu.open(true);
+            }
+            if (!this.feeds[i].show) {
+                this.feeds[i].menu.close(true);
+            }
+        }
+    },
 };
 
 function main(metadata, orientation, panel_height, instance_id) {
