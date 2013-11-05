@@ -149,6 +149,7 @@ FeedDisplayMenuItem.prototype = {
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
         this.show_read_items = params.show_read_items;
+        this.unread_count = 0;
 
         /* Create reader */
         this.reader = new FeedReader.FeedReader(
@@ -214,11 +215,7 @@ FeedDisplayMenuItem.prototype = {
     },
 
     get_unread_count: function() {
-        let count = 0;
-        for (i in this.reader.items)
-            count++;
-
-        return count;
+        return this.unread_count;
     },
 
     /* Rebuild the feed title, status, items from the feed reader */
@@ -288,9 +285,13 @@ FeedDisplayMenuItem.prototype = {
         this.mainbox.add(buttonbox);
 
         let menu_items = 0;
+        this.unread_count = 0;
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
             if (this.reader.items[i].read && !this.show_read_items)
                 continue;
+
+            if (!this.reader.items[i].read)
+                this.unread_count++;
 
             let item = new FeedMenuItem(this.reader.items[i]);
             item.connect("activate", function(actor, event) {
