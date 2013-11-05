@@ -53,6 +53,8 @@ LabelMenuItem.prototype = {
     _init: function (text, tooltip_text, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
+        this.addActor(new St.Label());
+
         let label = new St.Label({ text: text });
         this.addActor(label);
 
@@ -311,7 +313,6 @@ FeedDisplayMenuItem.prototype = {
     },
 
     on_open_state_changed: function(menu, open) {
-        this.show = open;
         if (open)
             this.owner.toggle_submenus(this);
         else
@@ -472,12 +473,11 @@ FeedApplet.prototype = {
                         show_feed_image: this.show_feed_image
                     });
             this.menu.addMenuItem(this.feeds[i]);
-
-            if (i == 0)
-                this.feeds[i].show = true;
-            else
-                this.feeds[i].show = false;
         }
+
+        if (this.feeds.length > 0)
+            this.feed_to_show = this.feeds[0];
+
         this.refresh();
     },
 
@@ -540,15 +540,13 @@ FeedApplet.prototype = {
     },
 
     toggle_submenus: function(feed_to_show) {
-        for (i in this.feeds) {
-            if (feed_to_show != null && feed_to_show != this.feeds[i]) {
-                this.feeds[i].show = false;
-            }
+        if (feed_to_show != null)
+            this.feed_to_show = feed_to_show;
 
-            if (this.feeds[i].show) {
+        for (i in this.feeds) {
+            if (this.feed_to_show == this.feeds[i]) {
                 this.feeds[i].menu.open(true);
-            }
-            if (!this.feeds[i].show) {
+            } else {
                 this.feeds[i].menu.close(true);
             }
         }
