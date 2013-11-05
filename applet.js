@@ -168,20 +168,27 @@ FeedDisplayMenuItem.prototype = {
             vertical: true
         });
         this.mainbox.add(new St.Label({text:_("_Loading")}));
-        let container = new St.BoxLayout();
-        container.add(this.mainbox);
 
         this.statusbox = new St.BoxLayout({
             style_class: 'feedreader-status'
         });
 
         /* Remove/re-add PopupSubMenuMenuItem actors to insert our own actors
-         * in place of the the regular label */
+         * in place of the the regular label. We use a table to increase
+         * control of the layout */
         this.removeActor(this.label);
         this.removeActor(this._triangle);
-        this.addActor(this.statusbox);
-        this.addActor(container);
-        this.addActor(this._triangle, {align: St.Align.START});
+        let table = new St.Table({homogeneous: false,
+                                    reactive: true });
+
+        table.add(this.statusbox,
+                {row: 0, col: 0, col_span: 1, x_expand: false, x_align: St.Align.START});
+        table.add(this.mainbox,
+                {row: 0, col: 1, col_span: 1, x_expand: true, x_align: St.Align.START});
+        table.add(this._triangle,
+                {row: 0, col: 2, col_span: 1, x_expand: false, x_align: St.Align.START});
+
+        this.addActor(table, {expand: true, align: St.Align.START});
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
