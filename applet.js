@@ -170,7 +170,8 @@ FeedDisplayMenuItem.prototype = {
         this.mainbox.add(new St.Label({text:_("_Loading")}));
 
         this.statusbox = new St.BoxLayout({
-            style_class: 'feedreader-status'
+            style_class: 'feedreader-status',
+            vertical: true
         });
 
         /* Remove/re-add PopupSubMenuMenuItem actors to insert our own actors
@@ -182,7 +183,7 @@ FeedDisplayMenuItem.prototype = {
                                     reactive: true });
 
         table.add(this.statusbox,
-                {row: 0, col: 0, col_span: 1, x_expand: false, x_align: St.Align.START});
+                {row: 0, col: 0, col_span: 1, x_expand: false, x_align: St.Align.START, y_align: St.Align.MIDDLE});
         table.add(this.mainbox,
                 {row: 0, col: 1, col_span: 1, x_expand: true, x_align: St.Align.START});
         table.add(this._triangle,
@@ -253,6 +254,7 @@ FeedDisplayMenuItem.prototype = {
             }
         }
 
+        /* Add buttons */
         let buttonbox = new St.BoxLayout({
             style_class: 'feedreader-title-buttons'
         });
@@ -291,6 +293,7 @@ FeedDisplayMenuItem.prototype = {
 
         this.mainbox.add(buttonbox);
 
+        /* Add feed items to submenu */
         let menu_items = 0;
         this.unread_count = 0;
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
@@ -308,6 +311,22 @@ FeedDisplayMenuItem.prototype = {
 
             menu_items++;
         }
+
+        /* Update statusbox */
+        if (this.unread_count > 0)
+            var status_icon = 'feed-new-symbolic';
+        else
+            var status_icon = 'feed-symbolic';
+
+        let _icon = new St.Icon({ icon_name: status_icon,
+                icon_type: St.IconType.SYMBOLIC,
+                style_class: 'popup-menu-icon'});
+        this.statusbox.add(_icon, {
+                x_fill: false,
+                x_align: St.Align.MIDDLE,
+                y_fill: false,
+                y_align: St.Align.END,
+                expand: true});
 
         this.owner.update();
     },

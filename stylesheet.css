@@ -24,6 +24,17 @@
     padding-left: 0em;
 }
 
+.feedreader-status {
+    spacing: .5em;
+    padding-left: 0em;
+    padding-right: .5em;
+}
+
+.feedreader-status > StLabel {
+    text-align: center;
+    font-weight: bold;
+}
+
 /* Cinnamon tooltips use id="Tooltip", but the default theme (and most others
  * use text-align: center. Tooltips created for feedreader items contain lots
  * of text so left-alignment makes for better readability
