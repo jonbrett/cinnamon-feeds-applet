@@ -75,22 +75,33 @@ function FeedMenuItem() {
 }
 
 FeedMenuItem.prototype = {
-    __proto__: Applet.MenuItem.prototype,
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
     _init: function (item, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this);
+
         this.item = item;
         if (this.item.read)
-            this._icon = 'feed-symbolic';
+            this._icon_name = 'feed-symbolic';
         else
-            this._icon = 'feed-new-symbolic';
+            this._icon_name = 'feed-new-symbolic';
 
-        Applet.MenuItem.prototype._init.call(this,
-                FeedReader.html2text(item.title),
-                this._icon,
-                Lang.bind(this, function() {
+        let table = new St.Table({homogeneous: false, reactive: true });
+
+        this.icon = new St.Icon({icon_name: this._icon_name,
+                icon_type: St.IconType.SYMBOLIC,
+                style_class: 'popup-menu-icon' });
+        table.add(this.icon, {row: 0, col: 0, col_span: 1, x_expand: false, x_align: St.Align.START});
+
+        this.label = new St.Label({text: FeedReader.html2text(item.title)});
+        this.label.set_margin_left(6.0);
+        table.add(this.label, {row: 0, col: 1, col_span: 1, x_align: St.Align.START});
+
+        this.addActor(table, {expand: true, span: 1, align: St.Align.START});
+
+        this.connect('activate', Lang.bind(this, function() {
                     this.read_item();
                 }));
-        this.icon.icon_type = St.IconType.SYMBOLIC;
 
         this.tooltip = new Tooltips.Tooltip(this.actor,
                 FeedReader.html2text(item.description));
@@ -124,8 +135,8 @@ FeedMenuItem.prototype = {
         /* Update icon */
         this.removeActor(this.label);
         this.removeActor(this.icon);
-        this._icon = 'feed-symbolic';
-        this.icon = new St.Icon({ icon_name: this._icon,
+        this._icon_name = 'feed-symbolic';
+        this.icon = new St.Icon({ icon_name: this._icon_name,
                 icon_type: St.IconType.SYMBOLIC,
                 style_class: 'popup-menu-icon' });
 
