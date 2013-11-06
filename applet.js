@@ -186,8 +186,6 @@ FeedDisplayMenuItem.prototype = {
                 {row: 0, col: 0, col_span: 1, x_expand: false, x_align: St.Align.START, y_align: St.Align.MIDDLE});
         table.add(this.mainbox,
                 {row: 0, col: 1, col_span: 1, x_expand: true, x_align: St.Align.START});
-        table.add(this._triangle,
-                {row: 0, col: 2, col_span: 1, x_expand: false, x_align: St.Align.START});
 
         this.addActor(table, {expand: true, align: St.Align.START});
 
