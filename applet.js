@@ -133,15 +133,8 @@ FeedMenuItem.prototype = {
         this.item.open();
 
         /* Update icon */
-        this.removeActor(this.label);
-        this.removeActor(this.icon);
         this._icon_name = 'feed-symbolic';
-        this.icon = new St.Icon({ icon_name: this._icon_name,
-                icon_type: St.IconType.SYMBOLIC,
-                style_class: 'popup-menu-icon' });
-
-        this.addActor(this.icon);
-        this.addActor(this.label);
+        this.icon.set_icon_name(this._icon_name);
     },
 };
 
