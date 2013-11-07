@@ -261,9 +261,10 @@ FeedDisplayMenuItem.prototype = {
             style_class: 'feedreader-title-buttons'
         });
 
-        buttonbox.add(new St.Label({ text: this.reader.title,
+        let _title = new St.Label({ text: this.reader.title,
             style_class: 'feedreader-title-label'
-        }));
+        });
+        buttonbox.add(_title);
 
         let button = new St.Button({ reactive: true });
         let icon = new St.Icon({
@@ -310,6 +311,10 @@ FeedDisplayMenuItem.prototype = {
 
             menu_items++;
         }
+
+        /* Append unread_count to title */
+        if (this.unread_count > 0)
+            _title.set_text(_title.get_text() + " [" + this.unread_count + "]");
 
         /* Update statusbox */
         if (this.unread_count > 0)
