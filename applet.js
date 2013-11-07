@@ -306,9 +306,6 @@ FeedDisplayMenuItem.prototype = {
                 this.unread_count++;
 
             let item = new FeedMenuItem(this.reader.items[i]);
-            item.connect("activate", function(actor, event) {
-                actor.read_item();
-            });
             this.menu.addMenuItem(item);
 
             menu_items++;
