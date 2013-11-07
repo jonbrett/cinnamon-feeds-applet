@@ -135,6 +135,8 @@ FeedMenuItem.prototype = {
         /* Update icon */
         this._icon_name = 'feed-symbolic';
         this.icon.set_icon_name(this._icon_name);
+
+        this.emit('item-read');
     },
 };
 
@@ -307,6 +309,7 @@ FeedDisplayMenuItem.prototype = {
                 this.unread_count++;
 
             let item = new FeedMenuItem(this.reader.items[i]);
+            item.connect('item-read', Lang.bind(this, function () { this.update(); }));
             this.menu.addMenuItem(item);
 
             menu_items++;
