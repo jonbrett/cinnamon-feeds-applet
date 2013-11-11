@@ -50,14 +50,20 @@ function LabelMenuItem() {
 LabelMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (text, tooltip, params) {
+    _init: function (text, tooltip_text, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
         let label = new St.Label({ text: text });
         this.addActor(label);
 
-        if (this.tooltip != '')
-            new Tooltips.Tooltip(this.actor, tooltip);
+        if (this.tooltip_text != '')
+            this.tooltip = new Tooltips.Tooltip(this.actor, tooltip_text);
+
+        /* Ensure tooltip is destroyed when this menu item is destroyed */
+        this.connect('destroy', Lang.bind(this, function() {
+            if (this.tooltip != undefined)
+                this.tooltip.destroy();
+        }));
     },
 };
 
@@ -97,23 +103,28 @@ FeedMenuItem.prototype = {
             style_class: 'feedreader-item-label'
         }));
 
-        let tooltip = new Tooltips.Tooltip(this.actor,
+        this.tooltip = new Tooltips.Tooltip(this.actor,
                 FeedReader.html2text(item.description));
 
         /* Some hacking of the underlying tooltip ClutterText to set wrapping,
          * format, etc */
         try {
-            tooltip._tooltip.style_class = 'feedreader-item-tooltip';
-            tooltip._tooltip.get_clutter_text().set_width(TOOLTIP_WIDTH);
-            tooltip._tooltip.get_clutter_text().set_line_alignment(0);
-            tooltip._tooltip.get_clutter_text().set_line_wrap(true);
-            tooltip._tooltip.get_clutter_text().set_markup(
+            this.tooltip._tooltip.style_class = 'feedreader-item-tooltip';
+            this.tooltip._tooltip.get_clutter_text().set_width(TOOLTIP_WIDTH);
+            this.tooltip._tooltip.get_clutter_text().set_line_alignment(0);
+            this.tooltip._tooltip.get_clutter_text().set_line_wrap(true);
+            this.tooltip._tooltip.get_clutter_text().set_markup(
                     FeedReader.html2pango(item.description));
         } catch (e) {
             /* If we couldn't tweak the tooltip format this is likely because
              * the underlying implementation has changed. Don't issue any
              * failure here */
         }
+
+        /* Ensure tooltip is destroyed when this menu item is destroyed */
+        this.connect('destroy', Lang.bind(this, function() {
+            this.tooltip.destroy();
+        }));
 
         this.addActor(box);
     },
