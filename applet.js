@@ -23,6 +23,7 @@ const UUID = "feeds@jonbrettdev.wordpress.com"
 const FEED_IMAGE_HEIGHT_MAX = 100;
 const FEED_IMAGE_WIDTH_MAX = 200;
 const TOOLTIP_WIDTH = 500.0;
+const MIN_MENU_WIDTH = 400;
 
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
@@ -77,7 +78,7 @@ function FeedMenuItem() {
 FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (item, params) {
+    _init: function (item, width, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this);
 
         this.item = item;
@@ -87,6 +88,7 @@ FeedMenuItem.prototype = {
             this._icon_name = 'feed-new-symbolic';
 
         let table = new St.Table({homogeneous: false, reactive: true });
+        table.set_width(width);
 
         this.icon = new St.Icon({icon_name: this._icon_name,
                 icon_type: St.IconType.SYMBOLIC,
@@ -104,6 +106,7 @@ FeedMenuItem.prototype = {
                 }));
 
         this.tooltip = new Tooltips.Tooltip(this.actor,
+                FeedReader.html2text(item.title) + '\n\n' +
                 FeedReader.html2text(item.description));
 
         /* Some hacking of the underlying tooltip ClutterText to set wrapping,
@@ -114,6 +117,9 @@ FeedMenuItem.prototype = {
             this.tooltip._tooltip.get_clutter_text().set_line_alignment(0);
             this.tooltip._tooltip.get_clutter_text().set_line_wrap(true);
             this.tooltip._tooltip.get_clutter_text().set_markup(
+                    '<span weight="bold">' +
+                    FeedReader.html2pango(item.title) +
+                    '</span>\n\n' +
                     FeedReader.html2pango(item.description));
         } catch (e) {
             /* If we couldn't tweak the tooltip format this is likely because
@@ -185,30 +191,20 @@ FeedDisplayMenuItem.prototype = {
          * control of the layout */
         this.removeActor(this.label);
         this.removeActor(this._triangle);
-        let table = new St.Table({homogeneous: false,
+        this.table = new St.Table({homogeneous: false,
                                     reactive: true });
 
-        table.add(this.statusbox,
+        this.table.add(this.statusbox,
                 {row: 0, col: 0, col_span: 1, x_expand: false, x_align: St.Align.START, y_align: St.Align.MIDDLE});
-        table.add(this.mainbox,
+        this.table.add(this.mainbox,
                 {row: 0, col: 1, col_span: 1, x_expand: true, x_align: St.Align.START});
 
-        this.addActor(table, {expand: true, align: St.Align.START});
+        this.addActor(this.table, {expand: true, align: St.Align.START});
+        this.addActor(this._triangle, {expand: false, align: St.Align.END});
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
         this.update();
-    },
-
-    _getPreferredWidth: function(actor, forHeight, alloc) {
-        PopupMenu.PopupSubMenuMenuItem.prototype._getPreferredWidth.call(this, actor, forHeight, alloc);
-
-        /* If the submenu's natural width is greater than the title's natural
-         * width, use it instead. This avoids lots of nasty menu resizing when
-         * we open/close submenus */
-        let [sub_min, sub_natural] = this.menu.actor.get_preferred_width(-1);
-        if (alloc.natural_size < sub_natural)
-            alloc.min_size = alloc.natural_size = sub_natural;
     },
 
     update_params: function(params) {
@@ -299,6 +295,12 @@ FeedDisplayMenuItem.prototype = {
         this.mainbox.add(buttonbox);
 
         /* Add feed items to submenu */
+        let width = this.table.get_width();
+        if (width < MIN_MENU_WIDTH) {
+            this.table.set_width(MIN_MENU_WIDTH);
+            width = MIN_MENU_WIDTH;
+        }
+
         let menu_items = 0;
         this.unread_count = 0;
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
@@ -308,7 +310,7 @@ FeedDisplayMenuItem.prototype = {
             if (!this.reader.items[i].read)
                 this.unread_count++;
 
-            let item = new FeedMenuItem(this.reader.items[i]);
+            let item = new FeedMenuItem(this.reader.items[i], width);
             item.connect('item-read', Lang.bind(this, function () { this.update(); }));
             this.menu.addMenuItem(item);
 
