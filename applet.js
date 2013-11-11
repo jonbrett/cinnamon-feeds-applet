@@ -321,22 +321,6 @@ FeedDisplayMenuItem.prototype = {
         if (this.unread_count > 0)
             _title.set_text(_title.get_text() + " [" + this.unread_count + "]");
 
-        /* Update statusbox */
-        if (this.unread_count > 0)
-            var status_icon = 'feed-new-symbolic';
-        else
-            var status_icon = 'feed-symbolic';
-
-        let _icon = new St.Icon({ icon_name: status_icon,
-                icon_type: St.IconType.SYMBOLIC,
-                style_class: 'popup-menu-icon'});
-        this.statusbox.add(_icon, {
-                x_fill: false,
-                x_align: St.Align.MIDDLE,
-                y_fill: false,
-                y_align: St.Align.END,
-                expand: true});
-
         this.owner.update();
     },
 
