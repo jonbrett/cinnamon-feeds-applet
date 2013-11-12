@@ -272,11 +272,11 @@ FeedDisplayMenuItem.prototype = {
         button.set_child(icon);
         button.url = this.url;
         button.connect('clicked', Lang.bind(this, function(button, event) {
-            Util.spawnCommandLine('xdg-open ' + this.url);
+            Util.spawnCommandLine('xdg-open ' + this.reader.link);
             this.owner.menu.close();
         }));
 
-        let tooltip = new Tooltips.Tooltip(button, this.url);
+        let tooltip = new Tooltips.Tooltip(button, this.reader.link);
         buttonbox.add(button);
 
         button = new St.Button({ reactive: true });
