@@ -131,8 +131,6 @@ FeedMenuItem.prototype = {
         this.connect('destroy', Lang.bind(this, function() {
             this.tooltip.destroy();
         }));
-
-        this.addActor(box);
     },
 
     read_item: function() {
