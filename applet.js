@@ -47,17 +47,17 @@ const _ = Gettext.gettext;
 /* Check if current Cinnamon version is greater than or equal to a specific
  * version */
 function cinnamon_version_gte(version) {
-    current = Config.PACKAGE_VERSION.split('.');
+    let current = Config.PACKAGE_VERSION.split('.').map(function(x) { return parseInt(x); });
+    let required = version.split('.').map(function(x) { return parseInt(x); });
 
-    try {
-        for (i in version.split('.')) {
-            if (parseInt(current[i]) < parseInt(version.split('.')[i])) {
-                return false;
-            }
-        }
-    } catch (e) {
-        return false;
+    for (i in required) {
+        if (required[i] > current[i])
+            return false;
+        if (required[i] < current[i])
+            return true;
     }
+
+    /* If we get here, the versions match exactly */
     return true;
 }
 
