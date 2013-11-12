@@ -29,6 +29,7 @@ imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
 const Applet = imports.ui.applet;
 const Cinnamon = imports.gi.Cinnamon;
+const Config = imports.misc.config;
 const FeedReader = imports.feedreader;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -42,6 +43,23 @@ const St = imports.gi.St;
 const Tooltips = imports.ui.tooltips;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
+
+/* Check if current Cinnamon version is greater than or equal to a specific
+ * version */
+function cinnamon_version_gte(version) {
+    let current = Config.PACKAGE_VERSION.split('.').map(function(x) { return parseInt(x); });
+    let required = version.split('.').map(function(x) { return parseInt(x); });
+
+    for (i in required) {
+        if (required[i] > current[i])
+            return false;
+        if (required[i] < current[i])
+            return true;
+    }
+
+    /* If we get here, the versions match exactly */
+    return true;
+}
 
 /* Menu item for displaying a simple message */
 function LabelMenuItem() {
@@ -438,14 +456,17 @@ FeedApplet.prototype = {
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
-        s = new Applet.MenuItem(
-                _("Settings"),
-                "emblem-system-symbolic",
-                Lang.bind(this, function() {
-                    Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
-        this._applet_context_menu.addMenuItem(s);
+        /* Include setting menu item in Cinnamon < 2.0.0 */
+        if (!cinnamon_version_gte('2.0.0')) {
+            s = new Applet.MenuItem(
+                    _("Settings"),
+                    "emblem-system-symbolic",
+                    Lang.bind(this, function() {
+                        Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
+                    }));
+            s.icon.icon_type = St.IconType.SYMBOLIC;
+            this._applet_context_menu.addMenuItem(s);
+        }
     },
 
     feed_list_file_changed: function() {
