@@ -286,10 +286,9 @@ FeedDisplayMenuItem.prototype = {
         button.set_child(icon);
         button.connect('clicked', Lang.bind(this, function(button, event) {
             this.owner.menu.close();
-            this.reader.mark_all_items_read();
-            this.update();
+            this.mark_all_items_read();
         }));
-        let tooltip = new Tooltips.Tooltip(button, _("Mark all as read"));
+        let tooltip = new Tooltips.Tooltip(button, _("Mark all read"));
         buttonbox.add(button);
 
         this.mainbox.add(buttonbox);
@@ -330,6 +329,11 @@ FeedDisplayMenuItem.prototype = {
 
         this.menu.addMenuItem(new LabelMenuItem(
                     message, full_message));
+    },
+
+    mark_all_items_read: function() {
+            this.reader.mark_all_items_read();
+            this.update();
     },
 
     on_open_state_changed: function(menu, open) {
@@ -411,8 +415,8 @@ FeedApplet.prototype = {
                 _("Mark all read"),
                 "object-select-symbolic",
                 Lang.bind(this, function() {
-                    for (var i = 0; i < this.reader.length; i++)
-                        this.reader[i].mark_all_items_read();
+                    for (var i = 0; i < this.feeds.length; i++)
+                        this.feeds[i].mark_all_items_read();
                     this.build_menu();
                 }));
         s.icon.icon_type = St.IconType.SYMBOLIC;
