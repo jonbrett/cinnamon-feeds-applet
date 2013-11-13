@@ -238,7 +238,8 @@ FeedDisplayMenuItem.prototype = {
     },
 
     get_title: function() {
-        return this.reader.title;
+        // returns the title or custom title, if defined
+        return this.custom_title || this.reader.title;
     },
 
     get_unread_count: function() {
@@ -278,11 +279,8 @@ FeedDisplayMenuItem.prototype = {
             style_class: 'feedreader-title-buttons'
         });
 
-        let used_title = this.reader.title;
         // use custom title if defined
-        if (this.custom_title) {
-            used_title = this.custom_title;
-        }
+        let used_title = this.custom_title || this.reader.title;
 
         let _title = new St.Label({ text: used_title,
             style_class: 'feedreader-title-label'
@@ -516,7 +514,7 @@ FeedApplet.prototype = {
     },
 
     edit_feeds_file: function() {
-        GLib.spawn_command_line_async('gedit ' + this.list_file);
+        GLib.spawn_command_line_async('gedit "' + this.list_file + '"');
     },
 
     url_changed: function() {
@@ -536,7 +534,8 @@ FeedApplet.prototype = {
             // check for custom title
             components = url_list[i].split(' ');
             url = components[0];
-            title = components[1];
+            components.splice(0, 1);
+            title = components.join(" ");
             this.feeds[i] = new FeedDisplayMenuItem(url, this,
                     {
                         max_items: this.max_items,
