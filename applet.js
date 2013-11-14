@@ -47,17 +47,17 @@ const _ = Gettext.gettext;
 /* Check if current Cinnamon version is greater than or equal to a specific
  * version */
 function cinnamon_version_gte(version) {
-    let current = Config.PACKAGE_VERSION.split('.').map(function(x) { return parseInt(x); });
-    let required = version.split('.').map(function(x) { return parseInt(x); });
+    current = Config.PACKAGE_VERSION.split('.');
 
-    for (i in required) {
-        if (required[i] > current[i])
-            return false;
-        if (required[i] < current[i])
-            return true;
+    try {
+        for (i in version.split('.')) {
+            if (parseInt(current[i]) < parseInt(version.split('.')[i])) {
+                return false;
+            }
+        }
+    } catch (e) {
+        return false;
     }
-
-    /* If we get here, the versions match exactly */
     return true;
 }
 
@@ -178,6 +178,7 @@ FeedDisplayMenuItem.prototype = {
         this.show_feed_image = params.show_feed_image;
         this.show_read_items = params.show_read_items;
         this.unread_count = 0;
+        this.custom_title = params.custom_title;
 
         /* Create reader */
         this.reader = new FeedReader.FeedReader(
@@ -186,7 +187,8 @@ FeedDisplayMenuItem.prototype = {
                 {
                     'onUpdate' : Lang.bind(this, this.update),
                     'onError' : Lang.bind(this, this.error)
-                });
+                }
+                );
 
         /* Create initial layout for menu title We wrap the main titlebox in a
          * container in order to avoid excessive spacing caused by the
@@ -235,7 +237,8 @@ FeedDisplayMenuItem.prototype = {
     },
 
     get_title: function() {
-        return this.reader.title;
+        // returns the title or custom title, if defined
+        return this.custom_title || this.reader.title;
     },
 
     get_unread_count: function() {
@@ -275,7 +278,10 @@ FeedDisplayMenuItem.prototype = {
             style_class: 'feedreader-title-buttons'
         });
 
-        let _title = new St.Label({ text: this.reader.title,
+        // use custom title if defined
+        let used_title = this.custom_title || this.reader.title;
+
+        let _title = new St.Label({ text: used_title,
             style_class: 'feedreader-title-label'
         });
         buttonbox.add(_title);
@@ -456,6 +462,15 @@ FeedApplet.prototype = {
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
+        var s = new Applet.MenuItem(
+                _("Edit Feeds File"),
+                null,
+                Lang.bind(this, function() {
+                    this.edit_feeds_file();
+                }));
+        s.icon.icon_type = St.IconType.SYMBOLIC;
+        this._applet_context_menu.addMenuItem(s);
+
         /* Include setting menu item in Cinnamon < 2.0.0 */
         if (!cinnamon_version_gte('2.0.0')) {
             s = new Applet.MenuItem(
@@ -486,13 +501,19 @@ FeedApplet.prototype = {
         // this has to be done because some text editors automatically
         // add an empty line at the end of a file and empty URLS cause the
         // reader to get hickups
+        //
+        // + get rid of lines starting with '#'
         for (var i in url_list) {
-            if (url_list[i].length == 0) {
+            if (url_list[i].length == 0 || url_list[i].substring(0, 1) == "#") {
                 url_list.splice(i--,1);
                 continue;
             }
         }
         this.feeds_changed(url_list);
+    },
+
+    edit_feeds_file: function() {
+        GLib.spawn_command_line_async('xdg-open "' + this.list_file + '"');
     },
 
     url_changed: function() {
@@ -508,12 +529,18 @@ FeedApplet.prototype = {
 
         this.menu.removeAll();
 
-        for (var i in url_list) {
-            this.feeds[i] = new FeedDisplayMenuItem(url_list[i], this,
+        for(var i = 0; i < url_list.length; i++) {
+            // check for custom title
+            components = url_list[i].split(' ');
+            url = components[0];
+            components.splice(0, 1);
+            title = components.join(" ");
+            this.feeds[i] = new FeedDisplayMenuItem(url, this,
                     {
                         max_items: this.max_items,
                         show_read_items: this.show_read_items,
-                        show_feed_image: this.show_feed_image
+                        show_feed_image: this.show_feed_image,
+                        custom_title: title
                     });
             this.menu.addMenuItem(this.feeds[i]);
         }
