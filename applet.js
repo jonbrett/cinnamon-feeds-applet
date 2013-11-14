@@ -58,7 +58,6 @@ function cinnamon_version_gte(version) {
     } catch (e) {
         return false;
     }
-
     return true;
 }
 

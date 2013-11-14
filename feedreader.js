@@ -378,7 +378,7 @@ FeedReader.prototype = {
 
 /* Convert html to plaintext */
 function html2text(html) {
-    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '');
+    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '').replace('&nbsp;', ' ');
 }
 
 /* Convert html to (basic) Gnome Pango markup */
@@ -389,6 +389,9 @@ function html2pango(html) {
 
     /* </p> <br/> --> newline */
     ret = ret.replace('<br/>', '\n').replace('</p>','\n');
+
+    /* &nbsp; --> space */
+    ret = ret.replace(/&nbsp;/g, ' ');
 
     /* Headings --> <b> + 2*newline */
     ret = ret.replace(/<h[0-9]>/g, esc_open+'span weight="bold"'+esc_close);
