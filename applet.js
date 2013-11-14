@@ -513,7 +513,7 @@ FeedApplet.prototype = {
     },
 
     edit_feeds_file: function() {
-        GLib.spawn_command_line_async('gedit "' + this.list_file + '"');
+        GLib.spawn_command_line_async('xdg-open "' + this.list_file + '"');
     },
 
     url_changed: function() {
