@@ -1,3 +1,14 @@
+0.8
+===
+- Symbolic feed icons not recoloured correctly on Ubuntu 12.04 [Issue #9]
+- Use accordion style menu to allow multiple feeds to be fully visible [Issue #15]
+- Fixed "stuck tooltip" issue [Issue #16]
+- Correctly convert HTML escape sequence &nbsp; in feed item titles and descriptions [Issue #18]
+- Updates for Cinnamon 2.0 (remove duplicate menu item for applet settings) [Issue #22]
+- Specify that feed update interval unit is minutes [Issue #23]
+- Switch from slider to spinbutton for feed update interval setting [Issue #24]
+- Feed file features: custom title, comments and edit from context menu [Issue #29]
+
 0.7
 ===
 - Add settings to load feed URLs from a file [Issue #20 and #21]
