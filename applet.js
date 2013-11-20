@@ -496,20 +496,20 @@ FeedApplet.prototype = {
             global.logError("error while parsing file " + e);
             this.feed_file_error = true;
         }
-        
+
         // eliminate empty urls
         // this has to be done because some text editors automatically
         // add an empty line at the end of a file and empty URLS cause the
         // reader to get hickups
         //
         // + get rid of lines starting with '#'
+        displayed_urls = []
         for (var i in url_list) {
-            if (url_list[i].length == 0 || url_list[i].substring(0, 1) == "#") {
-                url_list.splice(i--,1);
-                continue;
+            if (url_list[i].length > 0 && url_list[i].substring(0, 1) != "#") {
+                displayed_urls.push(url_list[i]);
             }
         }
-        this.feeds_changed(url_list);
+        this.feeds_changed(displayed_urls);
     },
 
     edit_feeds_file: function() {
