@@ -21,8 +21,10 @@ from PyQt4.QtGui import (
 
 class MainWindow(QWidget):
 
-    def __init__(self):
+    def __init__(self, feeds):
         super(MainWindow, self).__init__()
+
+        self.feed_list = feeds
 
         self.setWindowTitle("Manage your RSS feeds")
 
@@ -35,6 +37,10 @@ class MainWindow(QWidget):
         container = QVBoxLayout()
 
         container.addWidget(self.table)
+
+        self.addFeedButton = QPushButton("Add feed")
+        self.addFeedButton.clicked.connect(self.add_feed)
+        container.addWidget(self.addFeedButton)
 
         buttons = QHBoxLayout()
 
@@ -54,6 +60,8 @@ class MainWindow(QWidget):
 
         self.save_button.clicked.connect(self.read_table_entries)
 
+        self.fill_feed_list()
+
     def center(self):
         """
             Centers the window
@@ -63,22 +71,36 @@ class MainWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    def remove_entry(self, row_number):
+    def remove_feed(self, row_number):
         """
             removes the entry from the selected line
         """
-        self.table.removeRow(row_number)
+        print len(self.feed_list)
+        del self.feed_list[row_number]
+        print len(self.feed_list)
+        self.fill_feed_list()
 
-    def fill_feed_list(self, feeds):
+    def add_feed(self):
+        self.feed_list.append(
+            {
+                "url": "",
+                "custom_title": None,
+                "hidden": False
+            }
+        )
+
+        self.fill_feed_list()
+
+    def fill_feed_list(self):
         """
             Takes a list of dicts as load_feed_file creates them
             and fills the table widget with the content
         """
-
+        self.table.setRowCount(0)
         # resize table
-        self.table.setRowCount(len(feeds) + 1)
+        self.table.setRowCount(len(self.feed_list))
 
-        for i, feed in enumerate(feeds):
+        for i, feed in enumerate(self.feed_list):
             self.table.setItem(i, 0, QTableWidgetItem(feed["url"]))
             # if no custom title is set, display - None -
             if feed["custom_title"] is None:
@@ -94,12 +116,8 @@ class MainWindow(QWidget):
             self.table.setCellWidget(i, 2, box)
 
             button = QPushButton("delete")
-            button.clicked.connect(partial(self.remove_entry, i))
+            button.clicked.connect(partial(self.remove_feed, i))
             self.table.setCellWidget(i, 3, button)
-
-        # add the checkbox in the last row
-        box = QCheckBox()
-        self.table.setCellWidget(len(feeds), 2, box)
 
     def read_table_entries(self):
         """
@@ -170,9 +188,7 @@ if __name__ == '__main__':
 
     feeds = load_feed_file(feed_file_name)
 
-    app.window = MainWindow()
-
-    app.window.fill_feed_list(feeds)
+    app.window = MainWindow(feeds)
 
     app.window.show()
 
