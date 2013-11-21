@@ -21,7 +21,7 @@ from PyQt4.QtGui import (
 
 class MainWindow(QWidget):
 
-    def __init__(self, feeds):
+    def __init__(self, feeds, app):
         super(MainWindow, self).__init__()
 
         self.feed_list = feeds
@@ -32,6 +32,7 @@ class MainWindow(QWidget):
         self.table.setHorizontalHeaderLabels(["URL", "custom title", "hide", ""])
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setResizeMode(0, QHeaderView.Stretch)
+        self.table.cellChanged.connect(self.cell_changed)
 
         # assemble GUI elements
         container = QVBoxLayout()
@@ -45,6 +46,7 @@ class MainWindow(QWidget):
         buttons = QHBoxLayout()
 
         self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(app.exit)
         self.save_button = QPushButton("Save")
 
         buttons.addWidget(self.save_button)
@@ -62,6 +64,20 @@ class MainWindow(QWidget):
 
         self.fill_feed_list()
 
+    def cell_changed(self, row, column):
+
+        # url changed
+        if column == 0:
+            self.feed_list[row]["url"] = (
+                unicode(self.table.item(row, 0).text())
+            )
+        # title changed
+        if column == 1:
+            title = unicode(self.table.item(row, 1).text())
+            if len(title) == 0:
+                self.table.setItem(row, 1, QTableWidgetItem("- None -"))
+            self.feed_list[row]["custom_title"] = None
+
     def center(self):
         """
             Centers the window
@@ -75,9 +91,8 @@ class MainWindow(QWidget):
         """
             removes the entry from the selected line
         """
-        print len(self.feed_list)
         del self.feed_list[row_number]
-        print len(self.feed_list)
+
         self.fill_feed_list()
 
     def add_feed(self):
@@ -96,6 +111,7 @@ class MainWindow(QWidget):
             Takes a list of dicts as load_feed_file creates them
             and fills the table widget with the content
         """
+        self.table.blockSignals(True)
         self.table.setRowCount(0)
         # resize table
         self.table.setRowCount(len(self.feed_list))
@@ -118,6 +134,8 @@ class MainWindow(QWidget):
             button = QPushButton("delete")
             button.clicked.connect(partial(self.remove_feed, i))
             self.table.setCellWidget(i, 3, button)
+
+        self.table.blockSignals(False)
 
     def read_table_entries(self):
         """
@@ -188,7 +206,7 @@ if __name__ == '__main__':
 
     feeds = load_feed_file(feed_file_name)
 
-    app.window = MainWindow(feeds)
+    app.window = MainWindow(feeds, app)
 
     app.window.show()
 
