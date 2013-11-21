@@ -48,6 +48,10 @@ class MainWindow(QWidget):
         self.resize(500, 300)
         self.center()
 
+        # connect event handlers
+
+        self.save_button.clicked.connect(self.read_table_entries)
+
     def center(self):
         """
             Centers the window
@@ -85,6 +89,30 @@ class MainWindow(QWidget):
         box = QCheckBox()
         self.table.setCellWidget(len(feeds), 2, box)
 
+    def read_table_entries(self):
+        """
+            Reads the rows from self.table
+            and returns dicts: {"url", "custom_title"}
+        """
+        feeds = list()
+
+        for i in xrange(self.table.rowCount()):
+            url = self.table.item(i, 0)
+            title = self.table.item(i, 1)
+            checkbox = self.table.cellWidget(i, 2)
+            try:
+                feeds.append(
+                    {
+                    "url": unicode(url.text()),
+                    "custom_title": unicode(title.text()),
+                    "checked": checkbox.isChecked()
+                    }
+                )
+            except AttributeError:
+                print "empty"
+        from pprint import pprint
+        pprint(feeds)
+
 
 def load_feed_file(filename):
     """
@@ -119,6 +147,7 @@ def load_feed_file(filename):
                 pass
 
     return content
+
 
 if __name__ == '__main__':
 
