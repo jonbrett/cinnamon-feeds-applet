@@ -12,7 +12,8 @@ from PyQt4.QtGui import (
     QHBoxLayout,
     QPushButton,
     QDesktopWidget,
-    QHeaderView
+    QHeaderView,
+    QCheckBox
 )
 
 
@@ -23,8 +24,8 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Manage your RSS feeds")
 
-        self.table = QTableWidget(5, 2)
-        self.table.setHorizontalHeaderLabels(["URL", "custom title"])
+        self.table = QTableWidget(1, 3)
+        self.table.setHorizontalHeaderLabels(["URL", "custom title", "hide"])
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setResizeMode(0, QHeaderView.Stretch)
 
@@ -61,6 +62,10 @@ class MainWindow(QWidget):
             Takes a list of dicts as load_feed_file creates them
             and fills the table widget with the content
         """
+
+        # resize table
+        self.table.setRowCount(len(feeds) + 1)
+
         for i, feed in enumerate(feeds):
             self.table.setItem(i, 0, QTableWidgetItem(feed["url"]))
             # if no custom title is set, display - None -
@@ -69,6 +74,16 @@ class MainWindow(QWidget):
             else:
                 title = feed["custom_title"]
             self.table.setItem(i, 1, QTableWidgetItem(title))
+
+            # set hide checkbox
+            box = QCheckBox()
+            if feed["hidden"]:
+                box.setChecked(True)
+            self.table.setCellWidget(i, 2, box)
+
+        # add the checkbox in the last row
+        box = QCheckBox()
+        self.table.setCellWidget(len(feeds), 2, box)
 
 
 def load_feed_file(filename):
@@ -82,7 +97,11 @@ def load_feed_file(filename):
         for line in f:
             try:
                 if line[0] == "#":
-                    continue
+                    # cut out the comment and define this item as hidden
+                    line = line[1:]
+                    hidden = True
+                else:
+                    hidden = False
                 temp = line.split()
                 url = temp[0]
                 custom_title = None
@@ -91,7 +110,8 @@ def load_feed_file(filename):
                 content.append(
                     {
                         "url": url,
-                        "custom_title": custom_title
+                        "custom_title": custom_title,
+                        "hidden": hidden
                     }
                 )
             except IndexError:
