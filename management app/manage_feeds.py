@@ -1,6 +1,8 @@
 # -*- encoding: utf-8 -*-
 from __future__ import unicode_literals
 
+from functools import partial
+
 import sys
 
 from PyQt4.QtGui import (
@@ -24,8 +26,8 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Manage your RSS feeds")
 
-        self.table = QTableWidget(1, 3)
-        self.table.setHorizontalHeaderLabels(["URL", "custom title", "hide"])
+        self.table = QTableWidget(1, 4)
+        self.table.setHorizontalHeaderLabels(["URL", "custom title", "hide", ""])
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setResizeMode(0, QHeaderView.Stretch)
 
@@ -61,6 +63,12 @@ class MainWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
+    def remove_entry(self, row_number):
+        """
+            removes the entry from the selected line
+        """
+        self.table.removeRow(row_number)
+
     def fill_feed_list(self, feeds):
         """
             Takes a list of dicts as load_feed_file creates them
@@ -84,6 +92,10 @@ class MainWindow(QWidget):
             if feed["hidden"]:
                 box.setChecked(True)
             self.table.setCellWidget(i, 2, box)
+
+            button = QPushButton("delete")
+            button.clicked.connect(partial(self.remove_entry, i))
+            self.table.setCellWidget(i, 3, button)
 
         # add the checkbox in the last row
         box = QCheckBox()
