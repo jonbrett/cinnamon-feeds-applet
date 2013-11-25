@@ -21,10 +21,14 @@ from PyQt4.QtGui import (
 
 class MainWindow(QWidget):
 
-    def __init__(self, feeds, app):
+    def __init__(self, feeds, app, filename):
         super(MainWindow, self).__init__()
 
         self.feed_list = feeds
+
+        self.feed_file = filename
+
+        self.app = app
 
         self.setWindowTitle("Manage your RSS feeds")
 
@@ -60,11 +64,16 @@ class MainWindow(QWidget):
         self.resize(500, 300)
         self.center()
 
-        # connect event handlers
-
-        self.save_button.clicked.connect(self.read_table_entries)
+        self.save_button.clicked.connect(self.save_and_exit)
 
         self.fill_feed_list()
+
+    def save_and_exit(self):
+        """
+            Saves feeds to file and exits the app
+        """
+        self.write_feed_file()
+        self.app.exit(0)
 
     def cell_changed(self, row, column):
 
@@ -152,29 +161,18 @@ class MainWindow(QWidget):
 
         self.table.blockSignals(False)
 
-    def read_table_entries(self):
+    def write_feed_file(self):
         """
-            Reads the rows from self.table
-            and returns dicts: {"url", "custom_title"}
+            Writes the feed_list to the file
         """
-        feeds = list()
 
-        for i in xrange(self.table.rowCount()):
-            url = self.table.item(i, 0)
-            title = self.table.item(i, 1)
-            checkbox = self.table.cellWidget(i, 2)
-            try:
-                feeds.append(
-                    {
-                        "url": unicode(url.text()),
-                        "custom_title": unicode(title.text()),
-                        "checked": checkbox.isChecked()
-                    }
-                )
-            except AttributeError:
-                print "empty"
-        from pprint import pprint
-        pprint(feeds)
+        with open(self.feed_file, "w") as f:
+            for feed in self.feed_list:
+                comment = "#" if feed["hidden"] else ''
+                title = ''
+                if not feed["custom_title"] is None:
+                    title = " %s" % feed["custom_title"]
+                f.write("%s%s%s\n" % (comment, feed["url"], title))
 
 
 def load_feed_file(filename):
@@ -221,7 +219,7 @@ if __name__ == '__main__':
 
     feeds = load_feed_file(feed_file_name)
 
-    app.window = MainWindow(feeds, app)
+    app.window = MainWindow(feeds, app, filename=feed_file_name)
 
     app.window.show()
 
