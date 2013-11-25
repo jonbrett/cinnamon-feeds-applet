@@ -15,7 +15,7 @@ from PyQt4.QtGui import (
     QPushButton,
     QDesktopWidget,
     QHeaderView,
-    QCheckBox
+    QCheckBox,
 )
 
 
@@ -29,7 +29,9 @@ class MainWindow(QWidget):
         self.setWindowTitle("Manage your RSS feeds")
 
         self.table = QTableWidget(1, 4)
-        self.table.setHorizontalHeaderLabels(["URL", "custom title", "hide", ""])
+        self.table.setHorizontalHeaderLabels(
+            ["URL", "custom title", "hide", ""]
+        )
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setResizeMode(0, QHeaderView.Stretch)
         self.table.cellChanged.connect(self.cell_changed)
@@ -78,6 +80,17 @@ class MainWindow(QWidget):
                 self.table.setItem(row, 1, QTableWidgetItem("- None -"))
             self.feed_list[row]["custom_title"] = None
 
+    def checkbox_clicked(self, row):
+
+        box = self.table.cellWidget(row, 2)
+
+        state = box.checkState()
+
+        if state == 0:
+            self.feed_list[row]["hidden"] = False
+        else:
+            self.feed_list[row]["hidden"] = True
+
     def center(self):
         """
             Centers the window
@@ -111,6 +124,7 @@ class MainWindow(QWidget):
             Takes a list of dicts as load_feed_file creates them
             and fills the table widget with the content
         """
+
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         # resize table
@@ -130,6 +144,7 @@ class MainWindow(QWidget):
             if feed["hidden"]:
                 box.setChecked(True)
             self.table.setCellWidget(i, 2, box)
+            box.stateChanged.connect(partial(self.checkbox_clicked, i))
 
             button = QPushButton("delete")
             button.clicked.connect(partial(self.remove_feed, i))
@@ -151,9 +166,9 @@ class MainWindow(QWidget):
             try:
                 feeds.append(
                     {
-                    "url": unicode(url.text()),
-                    "custom_title": unicode(title.text()),
-                    "checked": checkbox.isChecked()
+                        "url": unicode(url.text()),
+                        "custom_title": unicode(title.text()),
+                        "checked": checkbox.isChecked()
                     }
                 )
             except AttributeError:
