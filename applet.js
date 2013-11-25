@@ -414,24 +414,14 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_feed_image", "show_feed_image", this.update_params, null);
 
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "use_list_file", "use_list_file", this.feed_source_changed, null);
+        this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
+                "url", "url_list_str", this.url_changed, null);
 
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "url", "url", this.url_changed, null);
-        this.url_changed();
+        this._convert_legacy_url_list();
 
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "list_file", "list_file", this.feed_list_file_changed, null);
-        this.feed_list_file_changed();
-    },
-    // called whenever a different feed source (file or list) is chosen
-    feed_source_changed: function() {
-        // just call both the file and list callback and let them figure
-        // out what to do
         this.url_changed();
-        this.feed_list_file_changed();
     },
+
     build_context_menu: function() {
         var s = new Applet.MenuItem(
                 _("Mark all read"),
@@ -484,42 +474,59 @@ FeedApplet.prototype = {
         }
     },
 
-    feed_list_file_changed: function() {
-        // if the file is not the source don't do anything
-        if (! this.use_list_file) return;
-        let filename = this.list_file;
-        let url_list = [];
-        try {
-            var content = Cinnamon.get_file_contents_utf8_sync(filename);
-            url_list = content.split("\n");
-        } catch (e) {
-            global.logError("error while parsing file " + e);
-            this.feed_file_error = true;
+    /* Converts a settings string into an array of objects, each containing a
+     * url and title property */
+    parse_feed_urls: function(str) {
+        let lines = str.split("\n");
+        let url_list = new Array();
+
+        for (var i in lines) {
+            /* Strip redundant (leading,trailing,multiple) whitespace */
+            lines[i] = lines[i].trim().replace(/\s+/g, " ");
+
+            /* Skip empty lines and lines starting with '#' */
+            if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
+                continue;
+
+            /* URL is the first word on the line, the rest of the line is an
+             * optional title */
+            url_list.push({
+                url: lines[i].split(" ")[0],
+                title: lines[i].split(" ").slice(1).join(" ")
+            });
         }
 
-        // eliminate empty urls
-        // this has to be done because some text editors automatically
-        // add an empty line at the end of a file and empty URLS cause the
-        // reader to get hickups
-        //
-        // + get rid of lines starting with '#'
-        displayed_urls = []
-        for (var i in url_list) {
-            if (url_list[i].length > 0 && url_list[i].substring(0, 1) != "#") {
-                displayed_urls.push(url_list[i]);
-            }
-        }
-        this.feeds_changed(displayed_urls);
+        return url_list;
     },
 
-    edit_feeds_file: function() {
-        GLib.spawn_command_line_async('xdg-open "' + this.list_file + '"');
+    /* Convert legacy space-separated URL list to newline-separated list */
+    _convert_legacy_url_list: function() {
+        /* All legacy strings are single line. So ignore anything multi-line */
+        if (this.url_list_str.indexOf("\n") != -1)
+            return;
+
+        let urls = this.url_list_str.trim().replace(/\s+/g, " ").split(" ");
+        let new_urls = new Array();
+
+        /* If every word in the string is an http[s]:// url then convert to a
+         * newline-separated list. If we encounter a non-URL then this is not a
+         * valid legacy URL list, so abort */
+        for (var i in urls) {
+            global.log("Checking " + urls[i]);
+            if (urls[i].substr(0,7) == "http://" || urls[i].substr(0,8) == "https://")
+                new_urls.push(urls[i]);
+            else
+                return;
+        }
+
+        /* Write bi-directional setting with newline-separated list */
+        this.url_list_str = new_urls.join("\n");
+
+        global.log("Converted legacy URL list setting");
     },
 
     url_changed: function() {
-        // if the list is not the source, don't do anything
-        if (this.use_list_file) return;
-        let url_list = this.url.replace(/\s+/g, " ").replace(/\s*$/, '').replace(/^\s*/, '').split(" ");
+        let url_list = this.parse_feed_urls(this.url_list_str);
         this.feeds_changed(url_list);
     },
 
@@ -530,17 +537,12 @@ FeedApplet.prototype = {
         this.menu.removeAll();
 
         for(var i = 0; i < url_list.length; i++) {
-            // check for custom title
-            components = url_list[i].split(' ');
-            url = components[0];
-            components.splice(0, 1);
-            title = components.join(" ");
-            this.feeds[i] = new FeedDisplayMenuItem(url, this,
+            this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
                         max_items: this.max_items,
                         show_read_items: this.show_read_items,
                         show_feed_image: this.show_feed_image,
-                        custom_title: title
+                        custom_title: url_list[i].title
                     });
             this.menu.addMenuItem(this.feeds[i]);
         }

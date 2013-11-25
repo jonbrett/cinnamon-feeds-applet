@@ -1,22 +1,9 @@
 {
     "url": {
-        "type" : "entry",
+        "type" : "textview",
         "default" : "http://fxfeeds.mozilla.com/en-US/firefox/headlines.xml",
         "description" : "Feed URL(s)",
-        "tooltip" : "Enter the URLs of a valid RSS/Atom feed. Separate multiple URLs with spaces"
-    },
-    "use_list_file" : {
-        "type" : "checkbox",
-        "default" : false,
-        "description" : "Use file as source of feeds instead of above list"
-    },
-    "list_file": {
-        "type" : "filechooser",
-        "default" : "",
-        "description" : "Feed List File",
-        "tooltip" : "Path to a text file with one feed URL per line",
-        "indent" : true,
-        "dependency" : "use_list_file"
+        "tooltip" : "Enter the URLs of a valid RSS/Atom feed, one feed per line"
     },
     "max_items": {
             "type" : "scale",
