@@ -16,7 +16,7 @@ class MainWindow(Gtk.Window):
 
         # Set window properties
         self.set_default_size(500, 200)
-        icon_path = os.path.abspath(os.path.dirname(__file__).join("../icon.png"))
+        icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"../icon.png"))
         self.set_icon_from_file(icon_path)
 
         box = Gtk.Box(False, 10, orientation=Gtk.Orientation.VERTICAL);
