@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from gi.repository import Gtk
 
 import sys
+import os
 
 class MainWindow(Gtk.Window):
 
@@ -13,8 +14,15 @@ class MainWindow(Gtk.Window):
         self.filename = filename;
         self.feeds = self.load_feed_file(filename);
 
+        # Set window properties
         self.set_default_size(500, 200)
+        icon_path = os.path.abspath(os.path.dirname(__file__).join("../icon.png"))
+        self.set_icon_from_file(icon_path)
 
+        box = Gtk.Box(False, 10, orientation=Gtk.Orientation.VERTICAL);
+        button_box = Gtk.Box(False, 10);
+
+        # Build feed table
         self.treeview = Gtk.TreeView(model=self.feeds)
         self.treeview.set_reorderable(True)
 
@@ -32,13 +40,36 @@ class MainWindow(Gtk.Window):
         column_title.set_expand(True)
         self.treeview.append_column(column_title)
 
-        renderer_hidden = Gtk.CellRendererToggle()
-        renderer_hidden.connect("toggled", self.hidden_toggled)
-        column_hidden = Gtk.TreeViewColumn("Disabled", renderer_hidden, active=2)
-        column_hidden.set_expand(False)
-        self.treeview.append_column(column_hidden)
+        renderer_enable = Gtk.CellRendererToggle()
+        renderer_enable.connect("toggled", self.enable_toggled)
+        column_enable = Gtk.TreeViewColumn("Enable", renderer_enable, active=2)
+        column_enable.set_expand(False)
+        self.treeview.append_column(column_enable)
 
-        self.add(self.treeview)
+        box.pack_start(self.treeview, True, True, 0)
+
+        # Add buttons
+        add_button = Gtk.Button(stock=Gtk.STOCK_ADD)
+        add_button.connect("clicked", self.new_feed)
+
+        del_button = Gtk.Button(stock=Gtk.STOCK_DELETE)
+        del_button.connect("clicked", self.remove_feed)
+
+        cancel_button = Gtk.Button(stock=Gtk.STOCK_CANCEL)
+        cancel_button.connect("clicked", Gtk.main_quit)
+
+        save_button = Gtk.Button(stock=Gtk.STOCK_APPLY)
+        save_button.connect("clicked", self.write_feed_file)
+        save_button.connect("clicked", Gtk.main_quit)
+
+        button_box.pack_start(add_button, False, False, 0);
+        button_box.pack_start(del_button, False, False, 0);
+        button_box.pack_end(save_button, False, False, 0);
+        button_box.pack_end(cancel_button, False, False, 0);
+
+        box.add(button_box)
+
+        self.add(box)
 
     def url_edited(self, widget, path, text):
         self.feeds[path][0] = text
@@ -49,27 +80,28 @@ class MainWindow(Gtk.Window):
         else:
             self.feeds[path][1] = None
 
-    def hidden_toggled(self, widget, path):
+    def enable_toggled(self, widget, path):
         self.feeds[path][2] = not self.feeds[path][2]
 
-    def remove_feed(self):
+    def remove_feed(self, button):
         selection = self.treeview.get_selection()
         result = selection.get_selected()
         if result:
             model, iter = result
         model.remove(iter)
 
-    def new_feed(self):
-        self.feeds.append("URL", "", False)
+    def new_feed(self, button):
+        self.feeds.append(["http://", "", True])
+        self.treeview.set_cursor(len(self.feeds) - 1,
+                        self.treeview.get_column(0), True)
 
-    def write_feed_file(self):
+    def write_feed_file(self, button):
         """
             Writes the feeds list to the file
         """
-
-        with open(self.feed_file, "w") as f:
-            for feed in [r[0:3] for r in self.feeds]:
-                comment = "#" if feed[2] else ''
+        with open(self.filename, "w") as f:
+            for feed in self.feeds:
+                comment = "#" if not feed[2] else ''
                 title = ''
                 if not feed[1] is None:
                     title = " %s" % feed[1]
@@ -84,17 +116,17 @@ class MainWindow(Gtk.Window):
             for line in f:
                 try:
                     if line[0] == "#":
-                        # cut out the comment and define this item as hidden
+                        # cut out the comment and define this item as disabled
                         line = line[1:]
-                        hidden = True
+                        enable = False
                     else:
-                        hidden = False
+                        enable = True
                     temp = line.split()
                     url = temp[0]
                     custom_title = None
                     if len(temp) > 1:
                         custom_title = " ".join(temp[1:])
-                    content.append([url, custom_title, hidden])
+                    content.append([url, custom_title, enable])
                 except IndexError:
                     # empty lines are ignored
                     pass
