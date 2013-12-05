@@ -97,39 +97,48 @@ class MainWindow(Gtk.Window):
 
     def write_feed_file(self, button):
         """
-            Writes the feeds list to the file
+            Writes the feeds list to the file/stdout
         """
-        with open(self.filename, "w") as f:
-            for feed in self.feeds:
-                comment = "#" if not feed[2] else ''
-                title = ''
-                if not feed[1] is None:
-                    title = " %s" % feed[1]
-                f.write("%s%s%s\n" % (comment, feed[0], title))
+        if self.filename is None:
+            f = sys.stdout
+        else:
+            f = open(self.filename, "w")
+
+        for feed in self.feeds:
+            comment = "#" if not feed[2] else ''
+            title = ''
+            if not feed[1] is None:
+                title = " %s" % feed[1]
+            f.write("%s%s%s\n" % (comment, feed[0], title))
 
     def load_feed_file(self, filename):
         """
-            Reads content of the feed file and returns a GTK.ListStore
+            Reads content of the feed file/stdin and returns a GTK.ListStore
         """
         content = Gtk.ListStore(str, str, bool)
-        with open(filename, "r") as f:
-            for line in f:
-                try:
-                    if line[0] == "#":
-                        # cut out the comment and define this item as disabled
-                        line = line[1:]
-                        enable = False
-                    else:
-                        enable = True
-                    temp = line.split()
-                    url = temp[0]
-                    custom_title = None
-                    if len(temp) > 1:
-                        custom_title = " ".join(temp[1:])
-                    content.append([url, custom_title, enable])
-                except IndexError:
-                    # empty lines are ignored
-                    pass
+
+        if (filename is None):
+            f = sys.stdin
+        else:
+            f = open(filename, "r")
+
+        for line in f:
+            try:
+                if line[0] == "#":
+                    # cut out the comment and define this item as disabled
+                    line = line[1:]
+                    enable = False
+                else:
+                    enable = True
+                temp = line.split()
+                url = temp[0]
+                custom_title = None
+                if len(temp) > 1:
+                    custom_title = " ".join(temp[1:])
+                content.append([url, custom_title, enable])
+            except IndexError:
+                # empty lines are ignored
+                pass
 
         return content
 
@@ -137,7 +146,10 @@ class MainWindow(Gtk.Window):
 if __name__ == '__main__':
 
     # get feed file name
-    feed_file_name = sys.argv[1]
+    if len(sys.argv) > 1:
+        feed_file_name = sys.argv[1]
+    else:
+        feed_file_name = None
 
     window = MainWindow(filename=feed_file_name)
     window.connect("delete-event", Gtk.main_quit);
