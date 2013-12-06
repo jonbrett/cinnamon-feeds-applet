@@ -444,19 +444,10 @@ FeedApplet.prototype = {
         this._applet_context_menu.addMenuItem(s);
 
         var s = new Applet.MenuItem(
-                _("Reload Feeds File"),
-                "view-refresh-symbolic",
+                _("Manage feeds"),
+                "document-properties-symbolic",
                 Lang.bind(this, function() {
-                    this.feed_list_file_changed();
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
-        this._applet_context_menu.addMenuItem(s);
-
-        var s = new Applet.MenuItem(
-                _("Edit Feeds File"),
-                null,
-                Lang.bind(this, function() {
-                    this.edit_feeds_file();
+                    this.manage_feeds();
                 }));
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
@@ -622,6 +613,58 @@ FeedApplet.prototype = {
                 this.feeds[i].menu.close(true);
             }
         }
+    },
+
+    _read_manage_app_stdout: function() {
+        /* Asynchronously wait for stdout of management app */
+        this._manage_data_stdout.fill_async(-1, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(stream, result) {
+            if (stream.fill_finish(result) == 0) {
+                try {
+                    let read = stream.peek_buffer().toString();
+                    if (read.length > 0) {
+                        this.url_list_str = read;
+                        this.url_changed();
+                    }
+                } catch(e) {
+                    global.log(e.toString());
+                }
+                this._manage_stdout.close(null)
+            } else {
+                /* Not enough space in stream buffer for all the output#
+                 * Double it and retry */
+                stream.set_buffer_size(2 * stream.get_buffer_size());
+                this._read_manage_app_stdout();
+            }
+        }));
+    },
+
+    /* Feed manager functions */
+    manage_feeds: function() {
+        let argv = [this.path + "/manage_feeds.py"];
+        let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
+                null,
+                argv,
+                null,
+                GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                null);
+
+        /* Store stdin, stdout but close stderr */
+        this._manage_stdout = new Gio.UnixInputStream({fd: stdout, close_fd: true});
+        this._manage_data_stdout = new Gio.DataInputStream({
+            base_stream: this._manage_stdout
+        });
+        this._manage_stdin = new Gio.UnixOutputStream({fd: stdin, close_fd: true});
+        this._manage_data_stdin = new Gio.DataOutputStream({
+            base_stream: this._manage_stdin
+        });
+        new Gio.UnixInputStream({fd: stderr, close_fd: true}).close(null);
+
+        /* Write current feeds list to management app stdin */
+        this._manage_data_stdin.put_string(this.url_list_str, null);
+        this._manage_stdin.close(null);
+
+        /* Get output from management app */
+        this._read_manage_app_stdout();
     },
 };
 
