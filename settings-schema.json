@@ -1,6 +1,16 @@
 {
+    "heading1": {
+        "type": "header",
+        "description": "Feed URLs"
+    },
+    "manage_feeds_button": {
+        "type": "button",
+        "description": "Manage Feeds...",
+        "callback": "manage_feeds",
+        "tooltip": "Launch the feed management app to add/remove/edit feeds"
+    },
     "url": {
-        "type" : "textview",
+        "type" : "generic",
         "default" : "http://fxfeeds.mozilla.com/en-US/firefox/headlines.xml",
         "description" : "Feed URL(s)",
         "tooltip" : "Enter the URLs of a valid RSS/Atom feed, one feed per line"
