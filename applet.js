@@ -417,8 +417,6 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
                 "url", "url_list_str", this.url_changed, null);
 
-        this._convert_legacy_url_list();
-
         this.url_changed();
     },
 
@@ -488,32 +486,6 @@ FeedApplet.prototype = {
         }
 
         return url_list;
-    },
-
-    /* Convert legacy space-separated URL list to newline-separated list */
-    _convert_legacy_url_list: function() {
-        /* All legacy strings are single line. So ignore anything multi-line */
-        if (this.url_list_str.indexOf("\n") != -1)
-            return;
-
-        let urls = this.url_list_str.trim().replace(/\s+/g, " ").split(" ");
-        let new_urls = new Array();
-
-        /* If every word in the string is an http[s]:// url then convert to a
-         * newline-separated list. If we encounter a non-URL then this is not a
-         * valid legacy URL list, so abort */
-        for (var i in urls) {
-            global.log("Checking " + urls[i]);
-            if (urls[i].substr(0,7) == "http://" || urls[i].substr(0,8) == "https://")
-                new_urls.push(urls[i]);
-            else
-                return;
-        }
-
-        /* Write bi-directional setting with newline-separated list */
-        this.url_list_str = new_urls.join("\n");
-
-        global.log("Converted legacy URL list setting");
     },
 
     url_changed: function() {
