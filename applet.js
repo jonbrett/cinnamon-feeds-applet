@@ -414,24 +414,12 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_feed_image", "show_feed_image", this.update_params, null);
 
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "use_list_file", "use_list_file", this.feed_source_changed, null);
+        this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
+                "url", "url_list_str", this.url_changed, null);
 
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "url", "url", this.url_changed, null);
         this.url_changed();
+    },
 
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "list_file", "list_file", this.feed_list_file_changed, null);
-        this.feed_list_file_changed();
-    },
-    // called whenever a different feed source (file or list) is chosen
-    feed_source_changed: function() {
-        // just call both the file and list callback and let them figure
-        // out what to do
-        this.url_changed();
-        this.feed_list_file_changed();
-    },
     build_context_menu: function() {
         var s = new Applet.MenuItem(
                 _("Mark all read"),
@@ -454,19 +442,10 @@ FeedApplet.prototype = {
         this._applet_context_menu.addMenuItem(s);
 
         var s = new Applet.MenuItem(
-                _("Reload Feeds File"),
-                "view-refresh-symbolic",
+                _("Manage feeds"),
+                "document-properties-symbolic",
                 Lang.bind(this, function() {
-                    this.feed_list_file_changed();
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
-        this._applet_context_menu.addMenuItem(s);
-
-        var s = new Applet.MenuItem(
-                _("Edit Feeds File"),
-                null,
-                Lang.bind(this, function() {
-                    this.edit_feeds_file();
+                    this.manage_feeds();
                 }));
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
@@ -484,42 +463,33 @@ FeedApplet.prototype = {
         }
     },
 
-    feed_list_file_changed: function() {
-        // if the file is not the source don't do anything
-        if (! this.use_list_file) return;
-        let filename = this.list_file;
-        let url_list = [];
-        try {
-            var content = Cinnamon.get_file_contents_utf8_sync(filename);
-            url_list = content.split("\n");
-        } catch (e) {
-            global.logError("error while parsing file " + e);
-            this.feed_file_error = true;
+    /* Converts a settings string into an array of objects, each containing a
+     * url and title property */
+    parse_feed_urls: function(str) {
+        let lines = str.split("\n");
+        let url_list = new Array();
+
+        for (var i in lines) {
+            /* Strip redundant (leading,trailing,multiple) whitespace */
+            lines[i] = lines[i].trim().replace(/\s+/g, " ");
+
+            /* Skip empty lines and lines starting with '#' */
+            if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
+                continue;
+
+            /* URL is the first word on the line, the rest of the line is an
+             * optional title */
+            url_list.push({
+                url: lines[i].split(" ")[0],
+                title: lines[i].split(" ").slice(1).join(" ")
+            });
         }
 
-        // eliminate empty urls
-        // this has to be done because some text editors automatically
-        // add an empty line at the end of a file and empty URLS cause the
-        // reader to get hickups
-        //
-        // + get rid of lines starting with '#'
-        displayed_urls = []
-        for (var i in url_list) {
-            if (url_list[i].length > 0 && url_list[i].substring(0, 1) != "#") {
-                displayed_urls.push(url_list[i]);
-            }
-        }
-        this.feeds_changed(displayed_urls);
-    },
-
-    edit_feeds_file: function() {
-        GLib.spawn_command_line_async('xdg-open "' + this.list_file + '"');
+        return url_list;
     },
 
     url_changed: function() {
-        // if the list is not the source, don't do anything
-        if (this.use_list_file) return;
-        let url_list = this.url.replace(/\s+/g, " ").replace(/\s*$/, '').replace(/^\s*/, '').split(" ");
+        let url_list = this.parse_feed_urls(this.url_list_str);
         this.feeds_changed(url_list);
     },
 
@@ -530,17 +500,12 @@ FeedApplet.prototype = {
         this.menu.removeAll();
 
         for(var i = 0; i < url_list.length; i++) {
-            // check for custom title
-            components = url_list[i].split(' ');
-            url = components[0];
-            components.splice(0, 1);
-            title = components.join(" ");
-            this.feeds[i] = new FeedDisplayMenuItem(url, this,
+            this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
                         max_items: this.max_items,
                         show_read_items: this.show_read_items,
                         show_feed_image: this.show_feed_image,
-                        custom_title: title
+                        custom_title: url_list[i].title
                     });
             this.menu.addMenuItem(this.feeds[i]);
         }
@@ -620,6 +585,58 @@ FeedApplet.prototype = {
                 this.feeds[i].menu.close(true);
             }
         }
+    },
+
+    _read_manage_app_stdout: function() {
+        /* Asynchronously wait for stdout of management app */
+        this._manage_data_stdout.fill_async(-1, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(stream, result) {
+            if (stream.fill_finish(result) == 0) {
+                try {
+                    let read = stream.peek_buffer().toString();
+                    if (read.length > 0) {
+                        this.url_list_str = read;
+                        this.url_changed();
+                    }
+                } catch(e) {
+                    global.log(e.toString());
+                }
+                this._manage_stdout.close(null)
+            } else {
+                /* Not enough space in stream buffer for all the output#
+                 * Double it and retry */
+                stream.set_buffer_size(2 * stream.get_buffer_size());
+                this._read_manage_app_stdout();
+            }
+        }));
+    },
+
+    /* Feed manager functions */
+    manage_feeds: function() {
+        let argv = [this.path + "/manage_feeds.py"];
+        let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
+                null,
+                argv,
+                null,
+                GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                null);
+
+        /* Store stdin, stdout but close stderr */
+        this._manage_stdout = new Gio.UnixInputStream({fd: stdout, close_fd: true});
+        this._manage_data_stdout = new Gio.DataInputStream({
+            base_stream: this._manage_stdout
+        });
+        this._manage_stdin = new Gio.UnixOutputStream({fd: stdin, close_fd: true});
+        this._manage_data_stdin = new Gio.DataOutputStream({
+            base_stream: this._manage_stdin
+        });
+        new Gio.UnixInputStream({fd: stderr, close_fd: true}).close(null);
+
+        /* Write current feeds list to management app stdin */
+        this._manage_data_stdin.put_string(this.url_list_str, null);
+        this._manage_stdin.close(null);
+
+        /* Get output from management app */
+        this._read_manage_app_stdout();
     },
 };
 
