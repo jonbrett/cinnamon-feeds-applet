@@ -27,7 +27,7 @@ class MainWindow(Gtk.Window):
         self.feeds = self.load_feed_file(filename);
 
         # Set window properties
-        self.set_default_size(500, 200)
+        self.set_default_size(600, 200)
         icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"icon.png"))
         self.set_icon_from_file(icon_path)
 
@@ -63,7 +63,11 @@ class MainWindow(Gtk.Window):
         column_enable.set_expand(False)
         self.treeview.append_column(column_enable)
 
-        box.pack_start(self.treeview, True, True, 0)
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC,
+                        Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.add(self.treeview)
+        box.pack_start(scrolled_window, True, True, 0)
 
         # Add buttons
         add_button = Gtk.Button(stock=Gtk.STOCK_ADD)
