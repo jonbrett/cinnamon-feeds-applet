@@ -2,9 +2,20 @@
 # -*- encoding: utf-8 -*-
 from __future__ import unicode_literals
 from gi.repository import Gtk
+import xml.etree.ElementTree as et
 
 import sys
 import os
+
+UI_INFO = """
+<ui>
+  <menubar name='MenuBar'>
+    <menu action='ImportMenu'>
+      <menuitem action='ImportOPML' />
+    </menu>
+  </menubar>
+</ui>
+"""
 
 class MainWindow(Gtk.Window):
 
@@ -21,6 +32,11 @@ class MainWindow(Gtk.Window):
 
         box = Gtk.Box(False, 10, orientation=Gtk.Orientation.VERTICAL);
         button_box = Gtk.Box(False, 10);
+
+        # Build menus
+        self.build_menus()
+        menubar = self.uimanager.get_widget("/MenuBar")
+        box.pack_start(menubar, False, False, 0)
 
         # Build feed table
         self.treeview = Gtk.TreeView(model=self.feeds)
@@ -71,6 +87,24 @@ class MainWindow(Gtk.Window):
 
         self.add(box)
 
+    def build_menus(self):
+        action_group = Gtk.ActionGroup("global_actions");
+
+        # Create Import menu
+        action_import_menu = Gtk.Action("ImportMenu", "Import", None, None)
+        action_group.add_action(action_import_menu)
+
+        action_import_opml= Gtk.Action("ImportOPML", "_Import OPML",
+                        "Import feeds from OPML file", Gtk.STOCK_FILE)
+        action_import_opml.connect("activate", self.on_menu_import_opml)
+        action_group.add_action(action_import_opml)
+
+        # Create UI manager
+        self.uimanager = Gtk.UIManager()
+        self.uimanager.add_ui_from_string(UI_INFO)
+        self.add_accel_group(self.uimanager.get_accel_group())
+        self.uimanager.insert_action_group(action_group)
+
     def url_edited(self, widget, path, text):
         self.feeds[path][0] = text
 
@@ -94,6 +128,34 @@ class MainWindow(Gtk.Window):
         self.feeds.append(["http://", "", True])
         self.treeview.set_cursor(len(self.feeds) - 1,
                         self.treeview.get_column(0), True)
+
+    def on_menu_import_opml(self, widget):
+        dialog = Gtk.FileChooserDialog("Choose a OPML feed file", self,
+                Gtk.FileChooserAction.OPEN, (
+                        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                        Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+                )
+
+        # Add filters to dialog box
+        filter_xml = Gtk.FileFilter()
+        filter_xml.set_name("OPML files")
+        filter_xml.add_pattern("*.opml")
+        dialog.add_filter(filter_xml)
+
+        filter_any = Gtk.FileFilter()
+        filter_any.set_name("All files")
+        filter_any.add_pattern("*")
+        dialog.add_filter(filter_any)
+
+        response = dialog.run()
+        filename = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK:
+            new_feeds = self.import_opml_file(filename)
+            if len(new_feeds) > 0:
+                self.feeds = new_feeds
+                self.treeview.set_model(self.feeds)
+
 
     def write_feed_file(self, button):
         """
@@ -142,6 +204,35 @@ class MainWindow(Gtk.Window):
 
         return content
 
+    def import_opml_file(self, filename):
+        """
+            Reads feeds list from an OPML file
+        """
+        new_feeds = Gtk.ListStore(str, str, bool)
+
+        try:
+            tree = et.parse(filename)
+            root = tree.getroot()
+            for outline in root.findall(".//outline[@type='rss']"):
+                new_feeds.append([
+                        unicode(outline.attrib.get('xmlUrl', '')),
+                        unicode(outline.attrib.get('text','')),
+                        True])
+        except Exception as e:
+            dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
+                    Gtk.ButtonsType.CANCEL, "Failed to import OPML")
+            dialog.format_secondary_text(str(e))
+            dialog.run()
+            dialog.destroy()
+            return new_feeds
+
+        dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO,
+                Gtk.ButtonsType.OK, "OPML file imported")
+        dialog.format_secondary_text("Imported %d feeds" % len(new_feeds))
+        dialog.run()
+        dialog.destroy()
+
+        return new_feeds
 
 if __name__ == '__main__':
 
