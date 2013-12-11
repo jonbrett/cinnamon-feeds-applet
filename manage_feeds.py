@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from gi.repository import Gtk
 import xml.etree.ElementTree as et
 
+from io import open
 import sys
 import os
 
@@ -164,14 +165,16 @@ class MainWindow(Gtk.Window):
         if self.filename is None:
             f = sys.stdout
         else:
-            f = open(self.filename, "w")
+            f = open(self.filename, mode="w", encoding="utf-8")
 
         for feed in self.feeds:
-            comment = "#" if not feed[2] else ''
-            title = ''
-            if not feed[1] is None:
-                title = " %s" % feed[1]
-            f.write("%s%s%s\n" % (comment, feed[0], title))
+            if not feed[2]:
+                f.write(u'#')
+            f.write(unicode(feed[0], 'utf8'))
+            if feed[1] is not None:
+                f.write(u' ')
+                f.write(unicode(feed[1], 'utf8'))
+            f.write(u'\n')
 
     def load_feed_file(self, filename):
         """
@@ -186,6 +189,9 @@ class MainWindow(Gtk.Window):
 
         for line in f:
             try:
+                # If input is coming from the command line, convert to utf8
+                if (filename is None):
+                    line = unicode(line, 'utf8')
                 if line[0] == "#":
                     # cut out the comment and define this item as disabled
                     line = line[1:]
