@@ -13,6 +13,10 @@ UI_INFO = """
   <menubar name='MenuBar'>
     <menu action='ImportMenu'>
       <menuitem action='ImportOPML' />
+      <menuitem action='ImportFeedFile' />
+    </menu>
+    <menu action='ExportMenu'>
+      <menuitem action='ExportFeedFile' />
     </menu>
   </menubar>
 </ui>
@@ -24,7 +28,9 @@ class MainWindow(Gtk.Window):
         super(Gtk.Window, self).__init__(title="Manage your feeds")
 
         self.filename = filename;
-        self.feeds = self.load_feed_file(filename);
+        self.feeds = Gtk.ListStore(str, str, bool)
+        for f in self.load_feed_file(filename):
+            self.feeds.append(f)
 
         # Set window properties
         self.set_default_size(600, 200)
@@ -104,6 +110,20 @@ class MainWindow(Gtk.Window):
         action_import_opml.connect("activate", self.on_menu_import_opml)
         action_group.add_action(action_import_opml)
 
+        action_import_file = Gtk.Action("ImportFeedFile", "_Import Feeds File",
+                        "Import feeds from file", Gtk.STOCK_FILE)
+        action_import_file.connect("activate", self.on_menu_import_feeds)
+        action_group.add_action(action_import_file)
+
+        # Create Export menu
+        action_export_menu = Gtk.Action("ExportMenu", "Export", None, None)
+        action_group.add_action(action_export_menu)
+
+        action_export_file= Gtk.Action("ExportFeedFile", "_Export Feeds File",
+                        "Export feeds to file", Gtk.STOCK_FILE)
+        action_export_file.connect("activate", self.on_menu_export_feeds)
+        action_group.add_action(action_export_file)
+
         # Create UI manager
         self.uimanager = Gtk.UIManager()
         self.uimanager.add_ui_from_string(UI_INFO)
@@ -157,19 +177,70 @@ class MainWindow(Gtk.Window):
         dialog.destroy()
         if response == Gtk.ResponseType.OK:
             new_feeds = self.import_opml_file(filename)
-            if len(new_feeds) > 0:
-                self.feeds = new_feeds
-                self.treeview.set_model(self.feeds)
+            for f in new_feeds:
+                self.feeds.append(f)
 
+    def on_menu_import_feeds(self, widget):
+        dialog = Gtk.FileChooserDialog("Load a feed file", self,
+                Gtk.FileChooserAction.OPEN, (
+                        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                        Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+                )
 
-    def write_feed_file(self, button):
+        # Add filters to dialog box
+        filter_text = Gtk.FileFilter()
+        filter_text.set_name("Text files")
+        filter_text.add_mime_type("text/plain")
+        dialog.add_filter(filter_text)
+
+        filter_any = Gtk.FileFilter()
+        filter_any.set_name("All files")
+        filter_any.add_pattern("*")
+        dialog.add_filter(filter_any)
+
+        response = dialog.run()
+        filename = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK:
+            new_feeds = self.load_feed_file(filename)
+            for f in new_feeds:
+                self.feeds.append(f)
+
+    def on_menu_export_feeds(self, widget):
+        dialog = Gtk.FileChooserDialog("Save a feed file", self,
+                Gtk.FileChooserAction.SAVE, (
+                        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                        Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+                )
+
+        # Add filters to dialog box
+        filter_text = Gtk.FileFilter()
+        filter_text.set_name("Text files")
+        filter_text.add_mime_type("text/plain")
+        dialog.add_filter(filter_text)
+
+        filter_any = Gtk.FileFilter()
+        filter_any.set_name("All files")
+        filter_any.add_pattern("*")
+        dialog.add_filter(filter_any)
+
+        response = dialog.run()
+        filename = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK:
+            new_feeds = self.write_feed_file(filename=filename)
+
+    def write_feed_file(self, button=None, filename=None):
         """
             Writes the feeds list to the file/stdout
         """
-        if self.filename is None:
+        if filename is None:
+           filename = self.filename
+
+        if filename is None:
             f = sys.stdout
         else:
-            f = open(self.filename, mode="w", encoding="utf-8")
+            f = open(filename, mode="w", encoding="utf-8")
 
         for feed in self.feeds:
             if not feed[2]:
@@ -182,9 +253,9 @@ class MainWindow(Gtk.Window):
 
     def load_feed_file(self, filename):
         """
-            Reads content of the feed file/stdin and returns a GTK.ListStore
+            Reads content of the feed file/stdin and returns a list of lists
         """
-        content = Gtk.ListStore(str, str, bool)
+        content = []
 
         if (filename is None):
             f = sys.stdin
@@ -218,7 +289,7 @@ class MainWindow(Gtk.Window):
         """
             Reads feeds list from an OPML file
         """
-        new_feeds = Gtk.ListStore(str, str, bool)
+        new_feeds = []
 
         try:
             tree = et.parse(filename)
@@ -227,7 +298,7 @@ class MainWindow(Gtk.Window):
                 new_feeds.append([
                         unicode(outline.attrib.get('xmlUrl', '')),
                         unicode(outline.attrib.get('text','')),
-                        True])
+                        False])
         except Exception as e:
             dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
                     Gtk.ButtonsType.CANCEL, "Failed to import OPML")
