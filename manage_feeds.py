@@ -210,7 +210,7 @@ class MainWindow(Gtk.Window):
         dialog = Gtk.FileChooserDialog("Save a feed file", self,
                 Gtk.FileChooserAction.SAVE, (
                         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                        Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+                        Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
                 )
 
         # Add filters to dialog box
