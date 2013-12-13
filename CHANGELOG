@@ -1,3 +1,7 @@
+0.10
+====
+- Feeds management app must use python2, not python3 [Issue #36]
+
 0.9
 ===
 - Add feed management app for adding/removing/re-ordering feeds [Issue #31]
