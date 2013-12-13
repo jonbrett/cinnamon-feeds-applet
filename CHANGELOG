@@ -1,3 +1,9 @@
+0.9
+===
+- Add feed management app for adding/removing/re-ordering feeds [Issue #31]
+- Support import of feeds from OPML files [Issue #25]
+- Support import/export of a feed list via management app [Issue #35]
+
 0.8
 ===
 - Symbolic feed icons not recoloured correctly on Ubuntu 12.04 [Issue #9]
