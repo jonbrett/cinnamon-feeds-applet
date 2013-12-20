@@ -3,10 +3,11 @@
     "name": "Feeds Reader",
     "description": "Displays RSS news feeds",
     "original-authors": [
-        "jonbrett.dev@gmail.com",
-        "lamouletrescool@gmail.com"
+        "Jonathan Brett <jonbrett.dev@gmail.com>",
+        "Niklas Meinzer <lamouletrescool@gmail.com>",
+        "Stephen Collins <scrivera64@gmail.com>"
     ],
-    "version": 0.10,
+    "version": 0.11,
     "url": "jonbrettdev.wordpress.com",
     "max-instances": "10"
 }

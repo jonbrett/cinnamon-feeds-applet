@@ -1,3 +1,8 @@
+0.11
+====
+- Remove some xsession-errors [Issue #37]
+- Remove reference to non-existent function [Issue #38]
+
 0.10
 ====
 - Feeds management app must use python2, not python3 [Issue #36]
