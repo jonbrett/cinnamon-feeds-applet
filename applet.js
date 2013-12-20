@@ -222,7 +222,7 @@ FeedDisplayMenuItem.prototype = {
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
-        this.update();
+        Mainloop.idle_add(Lang.bind(this, this.update));
     },
 
     update_params: function(params) {
