@@ -207,6 +207,8 @@ FeedReader.prototype = {
                 if (this._is_in_read_list(new_items[i].id))
                     new_items[i].read = true;
                 new_count++;
+                /* if there were no existing entries, assume this is startup */
+                var startup = true;
             }
         }
 
@@ -215,6 +217,9 @@ FeedReader.prototype = {
             global.log("Fetched " + new_count + " new items from " + this.url);
             this.items = new_items;
             this.callbacks.onUpdate();
+            if(!startup) {
+                this.callbacks.onNewItem(this.title, "New item!");
+            }
         }
         return 0;
     },

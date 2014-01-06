@@ -186,7 +186,8 @@ FeedDisplayMenuItem.prototype = {
                 '~/.cinnamon/' + UUID + '/' + owner.instance_id,
                 {
                     'onUpdate' : Lang.bind(this, this.update),
-                    'onError' : Lang.bind(this, this.error)
+                    'onError' : Lang.bind(this, this.error),
+                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification)
                 }
                 );
 
@@ -449,6 +450,15 @@ FeedApplet.prototype = {
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
+        var s = new Applet.MenuItem(
+                _("Test Notification"),
+                "document-properties-symbolic",
+                Lang.bind(this, function() {
+                    this.new_item_notification("Test News", "New item!");
+                }));
+        s.icon.icon_type = St.IconType.SYMBOLIC;
+        this._applet_context_menu.addMenuItem(s);
+
         /* Include setting menu item in Cinnamon < 2.0.0 */
         if (!cinnamon_version_gte('2.0.0')) {
             s = new Applet.MenuItem(
@@ -571,6 +581,18 @@ FeedApplet.prototype = {
     on_applet_clicked: function(event) {
         this.menu.toggle();
         this.toggle_submenus(null);
+    },
+
+    new_item_notification: function(feedtitle, itemtitle) {
+        /* Displays a popup notification using notify-send */
+
+        let home = GLib.get_home_dir();
+
+        let iconpath = home + "/.local/share/cinnamon/applets/" + UUID + "/icon.png";
+
+        let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
+        global.logError(command);
+        GLib.spawn_command_line_async(command);
     },
 
     toggle_submenus: function(feed_to_show) {
