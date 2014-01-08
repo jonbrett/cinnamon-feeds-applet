@@ -230,7 +230,7 @@ FeedDisplayMenuItem.prototype = {
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
         this.show_read_items = params.show_read_items;
-        this.notifications_enabled = params.notifications_enabled;
+
         this.update();
     },
 
@@ -392,6 +392,8 @@ FeedApplet.prototype = {
 
             this.feed_file_error = false;
 
+
+
         } catch (e) {
             global.logError(e);
         }
@@ -417,8 +419,7 @@ FeedApplet.prototype = {
                 "show_feed_image", "show_feed_image", this.update_params, null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                "notifications_enabled", "notifications_enabled", this.update_params, null);
-
+                "notifications_enabled", "notifications_enabled", null, null);
 
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
                 "url", "url_list_str", this.url_changed, null);
@@ -561,6 +562,7 @@ FeedApplet.prototype = {
             });
             this.feeds[i].update();
         }
+
     },
 
     refresh: function() {
@@ -592,7 +594,7 @@ FeedApplet.prototype = {
         /* Displays a popup notification using notify-send */
 
         // if notifications are disabled don't do anything
-        if(!self.notifications_enabled) {
+        if(!this.notifications_enabled) {
             return;
         }
         let home = GLib.get_home_dir();
@@ -600,7 +602,7 @@ FeedApplet.prototype = {
         let iconpath = home + "/.local/share/cinnamon/applets/" + UUID + "/icon.png";
 
         let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
-        global.logError(command);
+
         GLib.spawn_command_line_async(command);
     },
 
