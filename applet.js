@@ -230,6 +230,7 @@ FeedDisplayMenuItem.prototype = {
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
         this.show_read_items = params.show_read_items;
+        this.notifications_enabled = params.notifications_enabled;
         this.update();
     },
 
@@ -415,6 +416,10 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_feed_image", "show_feed_image", this.update_params, null);
 
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "notifications_enabled", "notifications_enabled", this.update_params, null);
+
+
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
                 "url", "url_list_str", this.url_changed, null);
 
@@ -586,6 +591,10 @@ FeedApplet.prototype = {
     new_item_notification: function(feedtitle, itemtitle) {
         /* Displays a popup notification using notify-send */
 
+        // if notifications are disabled don't do anything
+        if(!self.notifications_enabled) {
+            return;
+        }
         let home = GLib.get_home_dir();
 
         let iconpath = home + "/.local/share/cinnamon/applets/" + UUID + "/icon.png";
