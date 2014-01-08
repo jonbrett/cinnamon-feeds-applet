@@ -95,6 +95,10 @@ FeedReader.prototype = {
 
         /* Load items */
         this.load_items();
+
+        // This variable is used to surpress notifications at startup
+        // it will be set to false in _on_get_response during it's first run
+        this.startup = true;
     },
 
     get: function() {
@@ -211,8 +215,6 @@ FeedReader.prototype = {
                     unread_item = true;
                 }
                 new_count++;
-                /* if there were no existing entries, assume this is startup */
-                startup = true;
             }
         }
 
@@ -221,10 +223,11 @@ FeedReader.prototype = {
             global.log("Fetched " + new_count + " new items from " + this.url);
             this.items = new_items;
             this.callbacks.onUpdate();
-            if(unread_item) {
+            if(unread_item && !this.startup) {
                 this.callbacks.onNewItem(this.title, "Unread item!");
             }
         }
+        this.startup = false;
         return 0;
     },
 
