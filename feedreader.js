@@ -224,7 +224,7 @@ FeedReader.prototype = {
             this.items = new_items;
             this.callbacks.onUpdate();
             if(unread_item && !this.startup) {
-                this.callbacks.onNewItem(this.title, "Unread item!");
+                this.callbacks.onNewItem(this.title, "New item!");
             }
         }
         this.startup = false;
