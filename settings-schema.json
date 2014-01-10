@@ -45,5 +45,11 @@
         "default" : true,
         "description" : "Show feed image(s)",
         "tooltip" : "Controls whether a display the feed image (where available) in the feed menu"
+    },
+    "notifications_enabled": {
+        "type" : "checkbox",
+        "default" : true,
+        "description" : "Show notifications for new items",
+        "tooltip" : "If checked a popup notification will be displayed for new items"
     }
 }

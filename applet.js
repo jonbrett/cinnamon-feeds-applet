@@ -186,7 +186,8 @@ FeedDisplayMenuItem.prototype = {
                 '~/.cinnamon/' + UUID + '/' + owner.instance_id,
                 {
                     'onUpdate' : Lang.bind(this, this.update),
-                    'onError' : Lang.bind(this, this.error)
+                    'onError' : Lang.bind(this, this.error),
+                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification)
                 }
                 );
 
@@ -229,6 +230,7 @@ FeedDisplayMenuItem.prototype = {
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
         this.show_read_items = params.show_read_items;
+
         this.update();
     },
 
@@ -390,6 +392,8 @@ FeedApplet.prototype = {
 
             this.feed_file_error = false;
 
+
+
         } catch (e) {
             global.logError(e);
         }
@@ -413,6 +417,9 @@ FeedApplet.prototype = {
                 "max_items", "max_items", this.update_params, null);
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_feed_image", "show_feed_image", this.update_params, null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "notifications_enabled", "notifications_enabled", null, null);
 
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
                 "url", "url_list_str", this.url_changed, null);
@@ -546,6 +553,7 @@ FeedApplet.prototype = {
             });
             this.feeds[i].update();
         }
+
     },
 
     refresh: function() {
@@ -571,6 +579,21 @@ FeedApplet.prototype = {
     on_applet_clicked: function(event) {
         this.menu.toggle();
         this.toggle_submenus(null);
+    },
+
+    new_item_notification: function(feedtitle, itemtitle) {
+        /* Displays a popup notification using notify-send */
+
+        // if notifications are disabled don't do anything
+        if(!this.notifications_enabled) {
+            return;
+        }
+
+        let iconpath = this.path + "/icon.png";
+
+        let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
+
+        GLib.spawn_command_line_async(command);
     },
 
     toggle_submenus: function(feed_to_show) {
