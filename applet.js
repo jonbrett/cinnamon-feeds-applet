@@ -456,15 +456,6 @@ FeedApplet.prototype = {
         s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
-        var s = new Applet.MenuItem(
-                _("Test Notification"),
-                "document-properties-symbolic",
-                Lang.bind(this, function() {
-                    this.new_item_notification("Test News", "New item!");
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
-        this._applet_context_menu.addMenuItem(s);
-
         /* Include setting menu item in Cinnamon < 2.0.0 */
         if (!cinnamon_version_gte('2.0.0')) {
             s = new Applet.MenuItem(
