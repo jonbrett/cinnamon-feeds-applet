@@ -597,9 +597,8 @@ FeedApplet.prototype = {
         if(!this.notifications_enabled) {
             return;
         }
-        let home = GLib.get_home_dir();
 
-        let iconpath = home + "/.local/share/cinnamon/applets/" + UUID + "/icon.png";
+        let iconpath = this.path + "/icon.png";
 
         let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
 

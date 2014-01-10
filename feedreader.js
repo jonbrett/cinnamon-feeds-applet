@@ -95,10 +95,6 @@ FeedReader.prototype = {
 
         /* Load items */
         this.load_items();
-
-        // This variable is used to surpress notifications at startup
-        // it will be set to false in _on_get_response during it's first run
-        this.startup = true;
     },
 
     get: function() {
@@ -203,7 +199,7 @@ FeedReader.prototype = {
          * For existing items, transfer "read" property
          * For new items, check against the loaded historic read list */
         var new_count = 0;
-        var unread_item = false;
+        var unread_items = [];
         for (var i = 0; i < new_items.length; i++) {
             let existing = this._get_item_by_id(new_items[i].id);
             if (existing != null) {
@@ -212,7 +208,7 @@ FeedReader.prototype = {
                 if (this._is_in_read_list(new_items[i].id)) {
                     new_items[i].read = true;
                 } else {
-                    unread_item = true;
+                    unread_items.push(new_items[i]);
                 }
                 new_count++;
             }
@@ -223,11 +219,12 @@ FeedReader.prototype = {
             global.log("Fetched " + new_count + " new items from " + this.url);
             this.items = new_items;
             this.callbacks.onUpdate();
-            if(unread_item && !this.startup) {
-                this.callbacks.onNewItem(this.title, "New item!");
+            if(unread_items.length == 1) {
+                this.callbacks.onNewItem(this.title, unread_items[0].title);
+            } else if(unread_items.length > 1) {
+                this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
             }
         }
-        this.startup = false;
         return 0;
     },
 
