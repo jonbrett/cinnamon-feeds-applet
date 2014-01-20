@@ -387,7 +387,7 @@ FeedReader.prototype = {
 
 /* Convert html to plaintext */
 function html2text(html) {
-    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '').replace('&nbsp;', ' ');
+    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '').replace('&nbsp;', ' ').replace('&quot;', '"').replace('&rdquo;', '"').replace('&ldquo;', '"').replace('&#8220;', '"').replace('&#8221;', '"');
 }
 
 /* Convert html to (basic) Gnome Pango markup */
