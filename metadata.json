@@ -5,9 +5,10 @@
     "original-authors": [
         "Jonathan Brett <jonbrett.dev@gmail.com>",
         "Niklas Meinzer <lamouletrescool@gmail.com>",
-        "Stephen Collins <scrivera64@gmail.com>"
+        "Stephen Collins <scrivera64@gmail.com>",
+        "Kausheel Kumar <kausheelkumar@gmail.com>"
     ],
-    "version": 0.11,
+    "version": 0.12,
     "url": "jonbrettdev.wordpress.com",
     "max-instances": "10"
 }
