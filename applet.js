@@ -419,16 +419,12 @@ FeedApplet.prototype = {
                 "show_feed_image", "show_feed_image", this.update_params, null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                "notifications_enabled", "notifications_enabled", this.empty_function, null);
+                "notifications_enabled", "notifications_enabled", this.update_params, null);
 
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
                 "url", "url_list_str", this.url_changed, null);
 
         this.url_changed();
-    },
-
-    empty_function: function() {
-
     },
 
     build_context_menu: function() {
