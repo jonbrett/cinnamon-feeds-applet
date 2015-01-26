@@ -82,7 +82,7 @@ FeedReader.prototype = {
         this.link = "";
         this.items = new Array();
         this.read_list = new Array();
-        this.image = {}
+        this.image = {};
 
         /* Init HTTP session */
         try {
@@ -109,15 +109,15 @@ FeedReader.prototype = {
 
     process_rss: function(feed) {
         /* Get channel data */
-        this.title = String(feed..channel.title);
-        this.description = String(feed..channel.description);
-        this.link = String(feed..channel.link);
-        this.image.url = String(feed..channel.image.url);
-        this.image.width = String(feed..channel.image.width);
-        this.image.height = String(feed..channel.image.height);
+        this.title = String(feed.channel.title);
+        this.description = String(feed.channel.description);
+        this.link = String(feed.channel.link);
+        this.image.url = String(feed.channel.image.url);
+        this.image.width = String(feed.channel.image.width);
+        this.image.height = String(feed.channel.image.height);
 
         /* Get item list */
-        let feed_items = feed..channel.item;
+        let feed_items = feed.channel.item;
         let new_items = new Array();
         for (var i = 0; i < feed_items.length(); i++) {
             /* guid is optional in RSS spec, so use link as
@@ -144,20 +144,20 @@ FeedReader.prototype = {
         let atomns = new Namespace(feed.name().uri);
 
         /* Get channel data */
-        this.title = String(feed.atomns::title);
-        this.description = String(feed.atomns::subtitle);
-        this.link = String(feed.atomns::link.(@rel == "alternate").@href);
-        this.image.url = String(feed.atomns::logo);
+        this.title = String(feed.atomns.title);
+        this.description = String(feed.atomns.subtitle);
+        this.link = String(feed.atomns.link);
+        this.image.url = String(feed.atomns.logo);
 
         /* Get items */
-        let feed_items = feed.atomns::entry;
+        let feed_items = feed.atomns.entry;
         let new_items = new Array();
         for (var i = 0; i < feed_items.length(); i++) {
             new_items.push(new FeedItem(
-                    String(feed_items[i].atomns::id),
-                    String(feed_items[i].atomns::title),
-                    String(feed_items[i].atomns::link.(@rel== "alternate").@href),
-                    String(feed_items[i].atomns::summary),
+                    String(feed_items[i].atomns.id),
+                    String(feed_items[i].atomns.title),
+                    String(feed_items[i].atomns.link),
+                    String(feed_items[i].atomns.summary),
                     false,
                     this));
         }
