@@ -50,7 +50,7 @@ function cinnamon_version_gte(version) {
     let current = Config.PACKAGE_VERSION.split('.').map(function(x) { return parseInt(x); });
     let required = version.split('.').map(function(x) { return parseInt(x); });
 
-    for (i in required) {
+    for (var i in required) {
         if (required[i] > current[i])
             return false;
         if (required[i] < current[i])
@@ -77,7 +77,7 @@ LabelMenuItem.prototype = {
         let label = new St.Label({ text: text });
         this.addActor(label);
 
-        if (this.tooltip_text != '')
+        if (tooltip_text != '')
             this.tooltip = new Tooltips.Tooltip(this.actor, tooltip_text);
 
         /* Ensure tooltip is destroyed when this menu item is destroyed */
@@ -208,8 +208,10 @@ FeedDisplayMenuItem.prototype = {
         /* Remove/re-add PopupSubMenuMenuItem actors to insert our own actors
          * in place of the the regular label. We use a table to increase
          * control of the layout */
-        this.removeActor(this.label);
-        this.removeActor(this._triangle);
+        if(this.label.get_parent() == this.actor)
+            this.removeActor(this.label);
+        if(this._triangle.get_parent() == this.actor)
+            this.removeActor(this._triangle);
         this.table = new St.Table({homogeneous: false,
                                     reactive: true });
 
@@ -600,7 +602,7 @@ FeedApplet.prototype = {
         if (feed_to_show != null)
             this.feed_to_show = feed_to_show;
 
-        for (i in this.feeds) {
+        for (var i in this.feeds) {
             if (this.feed_to_show == this.feeds[i]) {
                 this.feeds[i].menu.open(true);
             } else {

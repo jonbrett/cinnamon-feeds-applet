@@ -24,8 +24,10 @@ const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
+const GXml = imports.gi.GXml;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
+//const Main = imports.ui.main;
 
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
@@ -82,7 +84,7 @@ FeedReader.prototype = {
         this.link = "";
         this.items = new Array();
         this.read_list = new Array();
-        this.image = {}
+        this.image = {};
 
         /* Init HTTP session */
         try {
@@ -107,57 +109,64 @@ FeedReader.prototype = {
                 Lang.bind(this, this._on_get_response));
     },
 
+    get_child_element: function(element, name) {
+        let list_elements = element.get_elements_by_tag_name(name)
+        for (var i = 0; i < list_elements.length; i++) {
+            var node = list_elements.item(i);
+            if((node) && (name == node.tag_name))
+                return node;
+        }
+        return null;
+    },
+
     process_rss: function(feed) {
         /* Get channel data */
-        this.title = String(feed..channel.title);
-        this.description = String(feed..channel.description);
-        this.link = String(feed..channel.link);
-        this.image.url = String(feed..channel.image.url);
-        this.image.width = String(feed..channel.image.width);
-        this.image.height = String(feed..channel.image.height);
-
+        let channel = feed.get_elements_by_tag_name('channel').item(0);
+        this.title = String(this.get_child_element(channel, 'title').content);
+        this.description = String(this.get_child_element(channel, 'description').content);
+        this.link = String(this.get_child_element(channel, 'link').content);
+        this.image.url = String(this.get_child_element(channel, 'url').content);
+        this.image.width = String(this.get_child_element(channel, 'width').content);
+        this.image.height = String(this.get_child_element(channel, 'height').content);
         /* Get item list */
-        let feed_items = feed..channel.item;
+        let feed_items = channel.get_elements_by_tag_name('item');
         let new_items = new Array();
-        for (var i = 0; i < feed_items.length(); i++) {
+        for (var i = 0; i < feed_items.length; i++) {
             /* guid is optional in RSS spec, so use link as
              * identifier if it's not present */
-            let id = String(feed_items[i].guid);
+            let feed_item = feed_items.item(i);
+            let id = String(this.get_child_element(feed_item, 'guid').content);
             if (id == '')
-                id = feed_items[i].link;
+                id = String(this.get_child_element(feed_item, 'link').content);
 
             new_items.push(new FeedItem(
                     id,
-                    String(feed_items[i].title),
-                    String(feed_items[i].link),
-                    String(feed_items[i].description),
+                    String(this.get_child_element(feed_item, 'title').content),
+                    String(this.get_child_element(feed_item, 'link').content),
+                    String(this.get_child_element(feed_item, 'description').content),
                     false,
                     this));
         }
         return new_items;
     },
 
-    process_atom: function(feed) {
-        /* Construct Atom XML namespace using uri from the feed in case the
-         * feed uses a non-standard uri. Normally this would be
-         * http://www.w3.org/2005/Atom */
-        let atomns = new Namespace(feed.name().uri);
-
-        /* Get channel data */
-        this.title = String(feed.atomns::title);
-        this.description = String(feed.atomns::subtitle);
-        this.link = String(feed.atomns::link.(@rel == "alternate").@href);
-        this.image.url = String(feed.atomns::logo);
+    process_atom: function(atomns) { 
+        /* Get atomns data */
+        this.title = String(this.get_child_element(atomns, 'title').content);
+        this.description = String(this.get_child_element(atomns, 'subtitle').content);
+        this.link = String(this.get_child_element(atomns, 'link').content);
+        this.image.url = String(this.get_child_element(atomns, 'logo').content);
 
         /* Get items */
-        let feed_items = feed.atomns::entry;
+        let feed_items = atomns.get_elements_by_tag_name('entry');
         let new_items = new Array();
-        for (var i = 0; i < feed_items.length(); i++) {
+        for (var i = 0; i < feed_items.length; i++) {
+            let feed_item = feed_items.item(i);
             new_items.push(new FeedItem(
-                    String(feed_items[i].atomns::id),
-                    String(feed_items[i].atomns::title),
-                    String(feed_items[i].atomns::link.(@rel== "alternate").@href),
-                    String(feed_items[i].atomns::summary),
+                    String(this.get_child_element(feed_item, 'id').content),
+                    String(this.get_child_element(feed_item, 'title').content),
+                    String(this.get_child_element(feed_item, 'link').content),
+                    String(this.get_child_element(feed_item, 'summary').content),
                     false,
                     this));
         }
@@ -165,23 +174,18 @@ FeedReader.prototype = {
     },
 
     _on_get_response: function(session, message) {
-        if (message.status_code != 200) {
-            return this.on_error('Unable to download feed',
-                    'Received HTTP ' + message.status_code + ' from ' + this.url);
-        }
-
         try {
-            var feed = new XML(message.response_body.data.replace(
-                    /^<\?xml\s+.*\?>/g, ''));
+            var feed = GXml.Document.from_string (message.response_body.data.replace(
+                    /^<\?xml\s+.*\?>/g, '')).document_element;
         } catch (e) {
-            return this.on_error('Failed to parse feed XML', e);
+            return this.on_error('Failed to parse feed XML', e.message);
         }
 
         /* Determine feed type and parse */
-        if (feed.name().localName == "rss") {
+        if (feed.node_name == "rss") {
             var new_items = this.process_rss(feed);
         } else {
-            if (feed.name().localName == "feed") {
+            if (feed.node_name == "feed") {
                 var new_items = this.process_atom(feed);
             } else {
                 return this.on_error("Unknown feed type", this.url);
