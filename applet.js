@@ -50,7 +50,7 @@ function cinnamon_version_gte(version) {
     let current = Config.PACKAGE_VERSION.split('.').map(function(x) { return parseInt(x); });
     let required = version.split('.').map(function(x) { return parseInt(x); });
 
-    for (i in required) {
+    for (var i in required) {
         if (required[i] > current[i])
             return false;
         if (required[i] < current[i])
@@ -77,7 +77,7 @@ LabelMenuItem.prototype = {
         let label = new St.Label({ text: text });
         this.addActor(label);
 
-        if (this.tooltip_text != '')
+        if (tooltip_text != '')
             this.tooltip = new Tooltips.Tooltip(this.actor, tooltip_text);
 
         /* Ensure tooltip is destroyed when this menu item is destroyed */
@@ -172,7 +172,6 @@ FeedDisplayMenuItem.prototype = {
 
     _init: function (url, owner, params) {
         PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, _("Loading feed"));
-
         this.owner = owner;
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
@@ -182,14 +181,14 @@ FeedDisplayMenuItem.prototype = {
 
         /* Create reader */
         this.reader = new FeedReader.FeedReader(
-                url,
-                '~/.cinnamon/' + UUID + '/' + owner.instance_id,
-                {
-                    'onUpdate' : Lang.bind(this, this.update),
-                    'onError' : Lang.bind(this, this.error),
-                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification)
-                }
-                );
+            url,
+            '~/.cinnamon/' + UUID + '/' + owner.instance_id,
+            {
+                'onUpdate' : Lang.bind(this, this.update),
+                'onError' : Lang.bind(this, this.error),
+                'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification)
+            }
+        );
 
         /* Create initial layout for menu title We wrap the main titlebox in a
          * container in order to avoid excessive spacing caused by the
@@ -208,8 +207,10 @@ FeedDisplayMenuItem.prototype = {
         /* Remove/re-add PopupSubMenuMenuItem actors to insert our own actors
          * in place of the the regular label. We use a table to increase
          * control of the layout */
-        this.removeActor(this.label);
-        this.removeActor(this._triangle);
+        if(this.label.get_parent() == this.actor)
+            this.removeActor(this.label);
+        if(this._triangle.get_parent() == this.actor)
+            this.removeActor(this._triangle);
         this.table = new St.Table({homogeneous: false,
                                     reactive: true });
 
@@ -368,6 +369,42 @@ FeedDisplayMenuItem.prototype = {
     },
 };
 
+function PopupIconMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+PopupIconMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (text, iconName, iconType, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        this.label = new St.Label({text: text});
+        this._icon = new St.Icon({ style_class: 'popup-menu-icon',
+            icon_name: iconName,
+            icon_type: iconType}); 
+        this.addActor(this._icon);
+        this.addActor(this.label);
+    },
+
+    setIconSymbolicName: function (iconName) {
+        this._icon = new St.Icon({ style_class: 'popup-menu-icon',
+            icon_name: iconName,
+            icon_type: St.IconType.SYMBOLIC});
+    },
+
+    setIconName: function (iconName) {
+        this._icon = new St.Icon({ style_class: 'popup-menu-icon',
+            icon_name: iconName,
+            icon_type: St.IconType.FULLCOLOR});
+    },
+
+    // Override columnWidths so that the popup menu doesn't separate the icon and the label
+    setColumnWidths: function() {
+        this._columnWidths = null;
+    }
+};
+
 function FeedApplet() {
     this._init.apply(this, arguments);
 }
@@ -377,7 +414,6 @@ FeedApplet.prototype = {
 
     _init: function(metadata, orientation, panel_height, instance_id) {
         Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
-
         try {
             this.feeds = new Array();
             this.path = metadata.path;
@@ -391,8 +427,6 @@ FeedApplet.prototype = {
             this.menuManager.addMenu(this.menu);
 
             this.feed_file_error = false;
-
-
 
         } catch (e) {
             global.logError(e);
@@ -428,32 +462,32 @@ FeedApplet.prototype = {
     },
 
     build_context_menu: function() {
-        var s = new Applet.MenuItem(
-                _("Mark all read"),
-                "object-select-symbolic",
-                Lang.bind(this, function() {
-                    for (var i = 0; i < this.feeds.length; i++)
-                        this.feeds[i].mark_all_items_read();
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
+        var s = new PopupIconMenuItem(
+            _("Mark all read"),
+            "object-select-symbolic",
+            St.IconType.SYMBOLIC);
+        s.connect('activate', Lang.bind(this, function() {
+            for (var i = 0; i < this.feeds.length; i++)
+                this.feeds[i].mark_all_items_read();
+        }));
         this._applet_context_menu.addMenuItem(s);
 
-        var s = new Applet.MenuItem(
-                _("Reload"),
-                "view-refresh-symbolic",
-                Lang.bind(this, function() {
-                    this.refresh();
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
+        s = new PopupIconMenuItem(
+            _("Reload"),
+            "view-refresh-symbolic",
+            St.IconType.SYMBOLIC);
+        s.connect('activate', Lang.bind(this, function() {
+            this.refresh();
+        }));
         this._applet_context_menu.addMenuItem(s);
 
-        var s = new Applet.MenuItem(
-                _("Manage feeds"),
-                "document-properties-symbolic",
-                Lang.bind(this, function() {
-                    this.manage_feeds();
-                }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
+        s = new PopupIconMenuItem(
+            _("Manage feeds"),
+            "document-properties-symbolic",
+            St.IconType.SYMBOLIC);
+        s.connect('activate', Lang.bind(this, function() {
+            this.manage_feeds();
+        }));
         this._applet_context_menu.addMenuItem(s);
 
         /* Include setting menu item in Cinnamon < 2.0.0 */
@@ -600,7 +634,7 @@ FeedApplet.prototype = {
         if (feed_to_show != null)
             this.feed_to_show = feed_to_show;
 
-        for (i in this.feeds) {
+        for (var i in this.feeds) {
             if (this.feed_to_show == this.feeds[i]) {
                 this.feeds[i].menu.open(true);
             } else {

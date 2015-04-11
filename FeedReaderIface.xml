@@ -1,0 +1,6 @@
+<interface name="org.Cinnamon.FeedReader">
+    <method name="SetJsonResult">
+        <arg type="s" direction="in" name="id" />
+        <arg type="s" direction="in" name="data" />
+    </method>
+</interface>
