@@ -24,14 +24,47 @@ const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
-const GXml = imports.gi.GXml;
+var ImportGXml;
+try {
+    ImportGXml = imports.gi.GXml;
+} catch(e) {
+    ImportGXml = null;
+}
+const GXml = ImportGXml;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
-//const Main = imports.ui.main;
+const Main = imports.ui.main;
 
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
 const MAX_FEED_ITEMS = 100;
+const UUID = "feeds@jonbrettdev.wordpress.com"
+const AppletDir = imports.ui.appletManager.appletMeta[UUID].path;
+const InterfacesDir = Gio.file_new_for_path(AppletDir);
+const FeedReaderIface = loadInterfaceXml("FeedReaderIface.xml");
+const WATCHER_INTERFACE = 'org.Cinnamon.FeedReader';
+const WATCHER_OBJECT = '/org/Cinnamon/FeedReader';
+
+/**
+ * loads a xml file into an in-memory string
+ */
+function loadInterfaceXml(filename) {
+
+    let file = InterfacesDir.get_child(filename);
+
+    let [ result, contents ] = GLib.file_get_contents(file.get_path());
+
+    if (result) {
+        //HACK: The "" + trick is important as hell because file_get_contents returns
+        // an object (WTF?) but Gio.makeProxyWrapper requires `typeof() == "string"`
+        // Otherwise, it will try to check `instanceof XML` and fail miserably because there
+        // is no `XML` on very recent SpiderMonkey releases (or, if SpiderMonkey is old enough,
+        // will spit out a TypeError soon).
+        return "<node>" + contents + "</node>";
+    } else {
+        throw new Error("AppIndicatorSupport: Could not load file: "+filename);
+    }
+};
 
 /* FeedItem objects are used to store data for a single item in a news feed */
 function FeedItem() {
@@ -72,7 +105,6 @@ function FeedReader() {
 FeedReader.prototype = {
 
     _init: function(url, path, callbacks) {
-
         this.url = url;
         this.path = path;
         this.callbacks = callbacks;
@@ -95,18 +127,111 @@ FeedReader.prototype = {
             throw "Failed to create HTTP session: " + e;
         }
 
+        if(GXml == null)
+            this._load_program();
+
         /* Load items */
         this.load_items();
     },
 
-    get: function() {
-        let msg = Soup.Message.new('GET', this.url);
+    _acquiredName: function() {
+        this._everAcquiredName = true;
+        global.log('Acquired name ' + WATCHER_INTERFACE);
+    },
 
+    _lostName: function() {
+        if (this._everAcquiredName)
+            global.log('Lost name ' + WATCHER_INTERFACE);
+        else
+            global.logWarning('Failed to acquire ' + WATCHER_INTERFACE);
+    },
+
+    SetJsonResult: function(id, data) {
+        let returnValue = null;
+        try {
+            returnValue = JSON.parse(data);
+            if (returnValue == undefined)
+                returnValue = null;
+        } catch (e) {
+            returnValue = null;
+        }
+        if(returnValue != null)
+            this._parse_json_feed(returnValue);
+        Main.notify("Result " + id + " " + returnValue + " " + global.get_current_time());
+    },
+
+    _load_program: function() {
+        this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(FeedReaderIface, this);
+        this._dbusImpl.export(Gio.DBus.session, WATCHER_OBJECT);
+        this._everAcquiredName = false;
+        this._ownName = Gio.DBus.session.own_name(WATCHER_INTERFACE,
+                                  Gio.BusNameOwnerFlags.NONE,
+                                  Lang.bind(this, this._acquiredName),
+                                  Lang.bind(this, this._lostName));
+        let program_file = InterfacesDir.get_child("xmltojson.py");
+        if(program_file.query_exists(null)) {
+            this._setChmod(program_file.get_path(), '+x');
+        }
+    },
+
+    _execute_program: function(id, url) {
+        let program_file = InterfacesDir.get_child("xmltojson.py")
+        if(program_file.query_exists(null)) {
+            let command = program_file.get_path() + " \"" + id + "\" \"" + url + "\"";
+            this._execCommand(command);
+            Main.notify(" " + id + " " + url);
+        }
+    },
+
+    _setChmod: function(path, permissions) {
+        let command = "chmod " + permissions + " \"" + path + "\"";
+        this._execCommand(command);
+    },
+
+    _execCommand: function(command) {
+        try {
+            let [success, argv] = GLib.shell_parse_argv(command);
+            this._trySpawnAsync(argv);
+            return true;
+        } catch (e) {
+            let title = _("Execution of '%s' failed:").format(command);
+            Main.notifyError(title, e.message);
+        }
+        return false;
+    },
+
+    _trySpawnAsync: function(argv) {
+        try {   
+            GLib.spawn_async(null, argv, null,
+                GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.STDOUT_TO_DEV_NULL  | GLib.SpawnFlags.STDERR_TO_DEV_NULL,
+                null, null);
+        } catch (err) {
+            if (err.code == GLib.SpawnError.G_SPAWN_ERROR_NOENT) {
+                err.message = _("Command not found.");
+            } else {
+                // The exception from gjs contains an error string like:
+                //   Error invoking GLib.spawn_command_line_async: Failed to
+                //   execute child process "foo" (No such file or directory)
+                // We are only interested in the part in the parentheses. (And
+                // we can't pattern match the text, since it gets localized.)
+                err.message = err.message.replace(/.*\((.+)\)/, '$1');
+            }
+            throw err;
+        }
+    },
+
+    get: function() {
         /* Reset error state */
         this.error = false;
 
-        this.session.queue_message(msg,
-                Lang.bind(this, this._on_get_response));
+        if(GXml != null) {
+            let msg = Soup.Message.new('GET', this.url);
+            this.session.queue_message(msg,
+                    Lang.bind(this, this._on_get_response));
+        } else {
+            let id = "" + global.get_current_time();
+            this._execute_program(id, this.url);
+        }
     },
 
     get_child_element: function(element, name) {
@@ -177,10 +302,13 @@ FeedReader.prototype = {
         try {
             var feed = GXml.Document.from_string (message.response_body.data.replace(
                     /^<\?xml\s+.*\?>/g, '')).document_element;
+            this._parse_gxml_feed(feed);
         } catch (e) {
             return this.on_error('Failed to parse feed XML', e.message);
         }
+    },
 
+    _parse_gxml_feed: function(feed) {
         /* Determine feed type and parse */
         if (feed.node_name == "rss") {
             var new_items = this.process_rss(feed);
@@ -230,6 +358,10 @@ FeedReader.prototype = {
             }
         }
         return 0;
+    },
+
+    _parse_json_feed: function(feed_string) {
+        Main.notify("_parse_json_feed " + feed_string);
     },
 
     mark_all_items_read: function() {

@@ -1,3 +1,10 @@
+0.13
+====
+- Add gxml library support for the missing native xml parser [Issues #48]
+- Implement an alternative Dbus mechanims to convert the xml to a json string format [Issues #48]
+- Add a MenuItem api internaly to replace the deprecate one on cinnamon 2.4.
+- Several minors bug fixed
+
 0.12
 ====
 - Add new/unread items notification [Issues #17, #40]
