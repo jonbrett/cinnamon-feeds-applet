@@ -9,11 +9,19 @@ from xml.sax.saxutils import XMLGenerator
 from xml.sax.xmlreader import AttributesImpl
 from gi.repository import GObject, Soup
 
-import sys, dbus
+import sys, re, dbus
 
+try: # pragma no cover
+    import feedparser
+except ImportError: # pragma no cover
+    feedparser = None
+try:  # pragma no cover
+    from urllib.parse import urlparse
+except ImportError: # pragma no cover
+    from urlparse import urlparse
 try:  # pragma no cover
     import json
-except ImportError:
+except ImportError: # pragma no cover
     import simplejson as json
 
 try:  # pragma no cover
@@ -76,11 +84,11 @@ class Downloader(GObject.GObject):
 
     def _get_soup_session(self):
         if self._session is None:
-            self._session  = Soup.SessionAsync()
-            self._session .set_property("timeout", 60)
-            self._session .set_property("idle-timeout", 60)
-            #self._session .set_property("user-agent", "Sugar/%s" % config.version)
-            self._session .add_feature_by_type(Soup.ProxyResolverDefault)
+            self._session = Soup.SessionAsync()
+            self._session.set_property("timeout", 60)
+            self._session.set_property("idle-timeout", 60)
+            #self._session.set_property("user-agent", "cinnamon/%s" % config.version)
+            self._session.add_feature_by_type(Soup.ProxyResolverDefault)
         return self._session
   
     def _setup_message(self, method="GET"):
@@ -94,6 +102,20 @@ class Downloader(GObject.GObject):
 
     def _soup_status_is_successful(self, status):
         return status >= 200 and status < 300
+
+    def download_to_temp(self):
+        """
+        Download the contents of the provided URL to temporary file storage.
+        Use .get_local_file_path() to find the location of where the file
+        is saved. Upon completion, a successful download is indicated by a
+        result of None in the complete signal parameters.
+        """
+        url = self._uri.to_string(False)
+        temp_file_path = self._get_temp_file_path(url)
+        self._output_file = Gio.File.new_for_path(temp_file_path)
+        self._output_stream = self._output_file.create(
+            Gio.FileCreateFlags.PRIVATE, None)
+        self.download_chunked()
   
     def download_chunked(self):
         """
@@ -176,7 +198,6 @@ class Downloader(GObject.GObject):
                 # string
                 # https://bugzilla.gnome.org/show_bug.cgi?id=704105
                 result = self._message.response_body.flatten().get_as_bytes()
-            print("passs")
         else:
             result = IOError("HTTP error code %d" % self._status_code)
 
@@ -197,6 +218,7 @@ class Downloader(GObject.GObject):
                     and not self._output_stream.has_pending():
                 self._complete()
             return
+
         self._write_next_buffer()
   
     def _write_next_buffer(self):
@@ -205,6 +227,29 @@ class Downloader(GObject.GObject):
             self._output_stream.write_bytes_async(data, GObject.PRIORITY_LOW,
                                                   None, self.__write_async_cb,
                                                   None)
+    '''
+    def get_string_from_bytes(self, bytes_data):
+        istream = Gio.MemoryInputStream.new()
+        istream.add_bytes(bytes_data)
+        if not self.istream.is_closed():
+            self.istream.close(None)
+        return 
+    '''
+
+    def _get_temp_file_path(self, uri):
+        # TODO: Should we use the HTTP headers for the file name?
+        scheme_, netloc_, path, params_, query_, fragment_ = \
+            urlparse(uri)
+        path = os.path.basename(path)
+
+        tmp_dir = os.path.join(env.get_profile_path(), 'data')
+        base_name, extension_ = os.path.splitext(path)
+        fd, file_path = tempfile.mkstemp(dir=tmp_dir,
+                                         prefix=base_name, suffix=extension_)
+        os.close(fd)
+        os.unlink(file_path)
+
+        return file_pat
 
 class ParsingInterrupted(Exception):
     pass
@@ -334,23 +379,24 @@ class XMLToJSON():
 
     def download_xml_to_string(self, request_id, request_url):
         downloader = Downloader(request_url)
-        downloader.download_chunked()
+        downloader.download()
         downloader.connect('complete', self.on_download_complete, request_id)
         self.loop.run()
 
     def on_download_complete(self, downloader, result, request_id):
         self.loop.quit()
         if result is not None:
+            xml_string = result.get_data()
             try:
-                xml_string = str(result, encoding='UTF-8')
+                xml_string = str(xml_string, encoding='UTF-8')
             except:
-                xml_string = str(result)
-            xml_string = '<doc><tag><subtag>data</subtag><t>data1</t><t>data2</t></tag></doc>'
+                pass
+            regex = re.compile(r"^<\?xml\s+.*\?>$", re.IGNORECASE)
+            xml_string = regex.sub("", xml_string)
             json_string = self.xml_to_json_format(xml_string)
         else:
             json_string = ""
         try:
-            print(request_id + json_string)
             session_bus = dbus.SessionBus()
             dbus_object = session_bus.get_object("org.Cinnamon.FeedReader", "/org/Cinnamon/FeedReader")
             if(dbus_object):
@@ -549,11 +595,59 @@ class XMLToJSON():
                 pass
             return value
 
+def native_feedparser(request_id, request_url):
+    feed = feedparser.parse(request_url)
+    
+    info = {}
+    
+    info["title"] = feed["feed"]["title"]
+    info["description"] = feed["feed"]["description"]
+    info["link"] = feed["feed"]["link"]
+    
+    #image is optional in the rss spec
+    imageInfo = {}
+    if "image" in feed["feed"]:
+        img = feed["feed"]["image"]
+        imageInfo["url"] = img["url"]
+        imageInfo["width"] = img["width"]
+        imageInfo["height"] = img["height"]
+    elif "logo" in feed["feed"]:
+        imageInfo["url"] = feed["feed"]["logo"]
+
+    info["image"] = imageInfo
+    info["entries"] = []
+    for item in feed["entries"]:
+        itemInfo = {}
+        #guid is optional, so use link if it's not given
+        if "guid" in item:
+            itemInfo["id"] = item["guid"]
+        else:
+            itemInfo["id"] = item["link"]
+        itemInfo["title"] = item["title"]
+        itemInfo["link"] = item["link"]
+        itemInfo["description"] = item["description"]
+        info["entries"].append(itemInfo)
+
+    json_string = json.dumps({"native": info})
+
+    try:
+        session_bus = dbus.SessionBus()
+        dbus_object = session_bus.get_object("org.Cinnamon.FeedReader", "/org/Cinnamon/FeedReader")
+        if(dbus_object):
+            SetJsonResult = dbus_object.get_dbus_method('SetJsonResult', 'org.Cinnamon.FeedReader')
+            if(SetJsonResult):
+                SetJsonResult(request_id, json_string)
+    except:
+        print("Error, could not find a Dbus implementation.")
+
 if __name__ == '__main__':  # pragma: no cover
     if len(sys.argv) == 3:
         request_id = sys.argv[1]
         request_url = sys.argv[2]
-        xmltojson = XMLToJSON()
-        xmltojson.download_xml_to_string(request_id, request_url)
+        if(feedparser is not None):
+            native_feedparser(request_id, request_url)
+        else:
+            xmltojson = XMLToJSON()
+            xmltojson.download_xml_to_string(request_id, request_url)
     else:
         print("Invalid number of parameters")
