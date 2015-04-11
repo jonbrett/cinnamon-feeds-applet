@@ -17,24 +17,16 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-const ByteArray = imports.byteArray;
 const Cinnamon = imports.gi.Cinnamon;
-const Gettext = imports.gettext.domain('cinnamon-applets');
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 const Signals = imports.signals;
-var ImportGXml;
-try {
-    ImportGXml = imports.gi.GXml;
-} catch(e) {
-    ImportGXml = null;
-}
-const GXml = ImportGXml;
 const Util = imports.misc.util;
+const Gettext = imports.gettext.domain('cinnamon-applets');
 const _ = Gettext.gettext;
-const Main = imports.ui.main;
+const GXml = importGXML();
 
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
@@ -78,15 +70,12 @@ DbusFeedReader.prototype = {
         }
         if(returnValue != null)
             this.emit('response', id, returnValue);
-        //Main.notify(""+data);
-        log("error" + data);
     },
 
     execute_request: function(id, url) {
         if(this.program_file.query_exists(null)) {
-            let command = "python3 " + this.program_file.get_path() + " \"" + id + "\" \"" + url + "\"";
+            let command = this.program_file.get_path() + " \"" + id + "\" \"" + url + "\"";
             this._execCommand(command);
-            //Main.notify(" " + id + " " + url);
         }
     },
 
@@ -407,7 +396,6 @@ FeedReader.prototype = {
                     var new_items = this.process_atom_json(json_feed["feed"]);
                 } else if ("native" in json_feed) {
                     var new_items = this.process_native_json(json_feed["native"]);
-                    Main.notify("native")
                 } else {
                     return this.on_error("Unknown feed type", this.url);
                 }
@@ -630,9 +618,22 @@ function loadInterfaceXml(filename) {
         // Otherwise, it will try to check `instanceof XML` and fail miserably because there
         // is no `XML` on very recent SpiderMonkey releases (or, if SpiderMonkey is old enough,
         // will spit out a TypeError soon).
-        return "<node>" + contents + "</node>";
-    } else {
-        throw new Error("AppIndicatorSupport: Could not load file: "+filename);
+        try {
+            eval('let oldContent='+contents);
+            return oldContent;
+        } catch(e) {
+            return "<node>" + contents + "</node>";
+        }
+    }
+    throw new Error("AppIndicatorSupport: Could not load file: "+filename);
+}
+
+/* Import GXML if is possible */
+function importGXML() {
+    try {
+        return imports.gi.GXml;
+    } catch(e) {
+        return null;
     }
 }
 

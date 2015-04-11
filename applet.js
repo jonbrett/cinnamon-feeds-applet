@@ -27,7 +27,6 @@ const MIN_MENU_WIDTH = 400;
 
 imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
-const Main = imports.ui.main
 const Applet = imports.ui.applet;
 const Cinnamon = imports.gi.Cinnamon;
 const Config = imports.misc.config;
