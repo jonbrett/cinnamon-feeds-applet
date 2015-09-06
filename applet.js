@@ -435,7 +435,6 @@ FeedApplet.prototype = {
                     for (var i = 0; i < this.feeds.length; i++)
                         this.feeds[i].mark_all_items_read();
                 }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
         var s = new Applet.MenuItem(
@@ -444,7 +443,6 @@ FeedApplet.prototype = {
                 Lang.bind(this, function() {
                     this.refresh();
                 }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
         var s = new Applet.MenuItem(
@@ -453,7 +451,6 @@ FeedApplet.prototype = {
                 Lang.bind(this, function() {
                     this.manage_feeds();
                 }));
-        s.icon.icon_type = St.IconType.SYMBOLIC;
         this._applet_context_menu.addMenuItem(s);
 
         /* Include setting menu item in Cinnamon < 2.0.0 */
@@ -464,7 +461,6 @@ FeedApplet.prototype = {
                     Lang.bind(this, function() {
                         Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
                     }));
-            s.icon.icon_type = St.IconType.SYMBOLIC;
             this._applet_context_menu.addMenuItem(s);
         }
     },
