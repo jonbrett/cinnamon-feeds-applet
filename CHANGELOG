@@ -1,3 +1,7 @@
+0.13
+====
+- Switch to external python app to get feeds [Issue #51]
+
 0.12
 ====
 - Add new/unread items notification [Issues #17, #40]
