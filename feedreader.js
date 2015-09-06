@@ -27,6 +27,8 @@ const Soup = imports.gi.Soup;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
 
+const APPLET_PATH = imports.ui.appletManager.appletMeta["feeds@jonbrettdev.wordpress.com"].path;
+
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
 const MAX_FEED_ITEMS = 100;
@@ -78,8 +80,6 @@ FeedReader.prototype = {
 
         /* Feed data */
         this.title = "";
-        this.description = "";
-        this.link = "";
         this.items = new Array();
         this.read_list = new Array();
         this.image = {}
@@ -98,100 +98,19 @@ FeedReader.prototype = {
     },
 
     get: function() {
-        let msg = Soup.Message.new('GET', this.url);
-
-        /* Reset error state */
-        this.error = false;
-
-        this.session.queue_message(msg,
-                Lang.bind(this, this._on_get_response));
+        Util.spawn_async(['python', APPLET_PATH+'/getFeed.py', this.url], Lang.bind(this, this.process_feed));
     },
-
-    process_rss: function(feed) {
-        /* Get channel data */
-        this.title = String(feed..channel.title);
-        this.description = String(feed..channel.description);
-        this.link = String(feed..channel.link);
-        this.image.url = String(feed..channel.image.url);
-        this.image.width = String(feed..channel.image.width);
-        this.image.height = String(feed..channel.image.height);
-
-        /* Get item list */
-        let feed_items = feed..channel.item;
-        let new_items = new Array();
-        for (var i = 0; i < feed_items.length(); i++) {
-            /* guid is optional in RSS spec, so use link as
-             * identifier if it's not present */
-            let id = String(feed_items[i].guid);
-            if (id == '')
-                id = feed_items[i].link;
-
-            new_items.push(new FeedItem(
-                    id,
-                    String(feed_items[i].title),
-                    String(feed_items[i].link),
-                    String(feed_items[i].description),
-                    false,
-                    this));
+    
+    process_feed: function(response) {
+        this.info = JSON.parse(response);
+        this.title = this.info.title;
+        if (this.info.image) this.image = this.info.image;
+        let entries = this.info.entries;
+        let new_items = [];
+        for (let i = 0; i < entries.length; i++) {
+            new_items.push(new FeedItem(entries[i].id, entries[i].title, entries[i].link, entries[i].description, false, this));
         }
-        return new_items;
-    },
-
-    process_atom: function(feed) {
-        /* Construct Atom XML namespace using uri from the feed in case the
-         * feed uses a non-standard uri. Normally this would be
-         * http://www.w3.org/2005/Atom */
-        let atomns = new Namespace(feed.name().uri);
-
-        /* Get channel data */
-        this.title = String(feed.atomns::title);
-        this.description = String(feed.atomns::subtitle);
-        this.link = String(feed.atomns::link.(@rel == "alternate").@href);
-        this.image.url = String(feed.atomns::logo);
-
-        /* Get items */
-        let feed_items = feed.atomns::entry;
-        let new_items = new Array();
-        for (var i = 0; i < feed_items.length(); i++) {
-            new_items.push(new FeedItem(
-                    String(feed_items[i].atomns::id),
-                    String(feed_items[i].atomns::title),
-                    String(feed_items[i].atomns::link.(@rel== "alternate").@href),
-                    String(feed_items[i].atomns::summary),
-                    false,
-                    this));
-        }
-        return new_items;
-    },
-
-    _on_get_response: function(session, message) {
-        if (message.status_code != 200) {
-            return this.on_error('Unable to download feed',
-                    'Received HTTP ' + message.status_code + ' from ' + this.url);
-        }
-
-        try {
-            var feed = new XML(message.response_body.data.replace(
-                    /^<\?xml\s+.*\?>/g, ''));
-        } catch (e) {
-            return this.on_error('Failed to parse feed XML', e);
-        }
-
-        /* Determine feed type and parse */
-        if (feed.name().localName == "rss") {
-            var new_items = this.process_rss(feed);
-        } else {
-            if (feed.name().localName == "feed") {
-                var new_items = this.process_atom(feed);
-            } else {
-                return this.on_error("Unknown feed type", this.url);
-            }
-        }
-
-        if (new_items.length < 1) {
-            return this.on_error("Unable to read feed contents", this.url);
-        }
-
+        
         /* Fetch image */
         this._fetch_image();
 
@@ -225,7 +144,6 @@ FeedReader.prototype = {
                 this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
             }
         }
-        return 0;
     },
 
     mark_all_items_read: function() {
