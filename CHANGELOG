@@ -1,3 +1,7 @@
+0.14
+====
+- Remove references to Applet.MenuItem.icon [Issue #52]
+
 0.13
 ====
 - Switch to external python app to get feeds [Issue #51]

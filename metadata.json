@@ -6,9 +6,10 @@
         "Jonathan Brett <jonbrett.dev@gmail.com>",
         "Niklas Meinzer <lamouletrescool@gmail.com>",
         "Stephen Collins <scrivera64@gmail.com>",
-        "Kausheel Kumar <kausheelkumar@gmail.com>"
+        "Kausheel Kumar <kausheelkumar@gmail.com>",
+        "mockturtl <mockturtl@users.noreply.github.com>"
     ],
-    "version": 0.13,
+    "version": 0.14,
     "url": "jonbrettdev.wordpress.com",
     "max-instanceso": "10"
 }
