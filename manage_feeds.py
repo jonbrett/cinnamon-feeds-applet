@@ -297,7 +297,7 @@ class MainWindow(Gtk.Window):
             for outline in root.findall(".//outline[@type='rss']"):
                 new_feeds.append([
                         unicode(outline.attrib.get('xmlUrl', '')),
-                        unicode(outline.attrib.get('text','')),
+                        unicode(outline.attrib.get('text','')).encode('ascii', 'ignore'),
                         False])
         except Exception as e:
             dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
