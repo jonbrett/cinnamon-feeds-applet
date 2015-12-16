@@ -242,6 +242,12 @@ class MainWindow(Gtk.Window):
         else:
             f = open(filename, mode="w", encoding="utf-8")
 
+        # Need to check if all feeds have been removed
+        if len(self.feeds) == 0:
+            f.write(u'#')
+            f.write('')
+            f.write(u'\n')
+
         for feed in self.feeds:
             if not feed[2]:
                 f.write(u'#')
