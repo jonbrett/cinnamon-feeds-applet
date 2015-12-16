@@ -44,6 +44,8 @@ const Tooltips = imports.ui.tooltips;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
 
+const Logger = imports.logger;
+
 /* Check if current Cinnamon version is greater than or equal to a specific
  * version */
 function cinnamon_version_gte(version) {
@@ -226,7 +228,7 @@ FeedDisplayMenuItem.prototype = {
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
 
-    update_params: function(params) {
+    on_settings_changed: function(params) {
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
         this.show_read_items = params.show_read_items;
@@ -400,6 +402,8 @@ FeedApplet.prototype = {
 
         this.init_settings();
 
+        this.logger.debug("Loading feeds@jonbrettdev.wordpress.com with Debug logging enabled.");
+
         this.build_context_menu();
         this.update();
     },
@@ -408,21 +412,51 @@ FeedApplet.prototype = {
         this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                "refresh_interval", "refresh_interval_mins", this.refresh,
+                "refresh_interval",
+                "refresh_interval_mins",
+                this.refresh,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                "show_read_items", "show_read_items", this.update_params, null);
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "max_items", "max_items", this.update_params, null);
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "show_feed_image", "show_feed_image", this.update_params, null);
+                "show_read_items",
+                "show_read_items",
+                this.on_settings_changed,
+                null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
-                "notifications_enabled", "notifications_enabled", this.update_params, null);
+                "max_items",
+                "max_items",
+                this.update_params,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_feed_image",
+                "show_feed_image",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "notifications_enabled",
+                "notifications_enabled",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "enable-verbose-logging",
+                "enable_verbose_logging",
+                this.on_settings_changed,
+                null);
 
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
-                "url", "url_list_str", this.url_changed, null);
+                "url",
+                "url_list_str",
+                this.url_changed,
+                null);
+
+        this.logger = new Logger.Logger({
+            uuid: UUID,
+            verboseLogging: this.settings.getValue("enable-verbose-logging")
+        });
 
         this.url_changed();
     },
@@ -492,11 +526,11 @@ FeedApplet.prototype = {
 
     url_changed: function() {
         let url_list = this.parse_feed_urls(this.url_list_str);
-        this.feeds_changed(url_list);
+        this.on_feeds_changed(url_list);
     },
 
     // called when feeds have been added or removed
-    feeds_changed: function(url_list) {
+    on_feeds_changed: function(url_list) {
         this.feeds = new Array();
 
         this.menu.removeAll();
@@ -540,16 +574,16 @@ FeedApplet.prototype = {
         this.set_applet_tooltip(tooltip);
     },
 
-    update_params: function() {
+    on_settings_changed: function() {
         for (var i = 0; i < this.feeds.length; i++) {
-            this.feeds[i].update_params({
+            this.feeds[i].on_settings_changed({
                     max_items: this.max_items,
                     show_read_items: this.show_read_items,
                     show_feed_image: this.show_feed_image
             });
             this.feeds[i].update();
         }
-
+        this.logger.verboseLogging = this.settings.getValue("enable-verbose-logging");
     },
 
     refresh: function() {
@@ -616,6 +650,7 @@ FeedApplet.prototype = {
                         this.url_changed();
                     }
                 } catch(e) {
+                    this.logger.error(e);
                     global.log(e.toString());
                 }
                 this._manage_stdout.close(null)
@@ -630,31 +665,39 @@ FeedApplet.prototype = {
 
     /* Feed manager functions */
     manage_feeds: function() {
-        let argv = [this.path + "/manage_feeds.py"];
-        let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
-                null,
-                argv,
-                null,
-                GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-                null);
+        try {
+            let argv = [this.path + "/manage_feeds.py"];
+            let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
+                    null,
+                    argv,
+                    null,
+                    GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                    null);
 
-        /* Store stdin, stdout but close stderr */
-        this._manage_stdout = new Gio.UnixInputStream({fd: stdout, close_fd: true});
-        this._manage_data_stdout = new Gio.DataInputStream({
-            base_stream: this._manage_stdout
-        });
-        this._manage_stdin = new Gio.UnixOutputStream({fd: stdin, close_fd: true});
-        this._manage_data_stdin = new Gio.DataOutputStream({
-            base_stream: this._manage_stdin
-        });
-        new Gio.UnixInputStream({fd: stderr, close_fd: true}).close(null);
+            /* Store stdin, stdout but close stderr */
+            this._manage_stdout = new Gio.UnixInputStream({fd: stdout, close_fd: true});
+            this._manage_data_stdout = new Gio.DataInputStream({
+                base_stream: this._manage_stdout
+            });
+            this._manage_stdin = new Gio.UnixOutputStream({fd: stdin, close_fd: true});
+            this._manage_data_stdin = new Gio.DataOutputStream({
+                base_stream: this._manage_stdin
+            });
+            new Gio.UnixInputStream({fd: stderr, close_fd: true}).close(null);
 
-        /* Write current feeds list to management app stdin */
-        this._manage_data_stdin.put_string(this.url_list_str, null);
-        this._manage_stdin.close(null);
-
+            /* Write current feeds list to management app stdin */
+            this._manage_data_stdin.put_string(this.url_list_str, null);
+            this._manage_stdin.close(null);
+        }
+        catch (e) {
+            if(this.logger != undefined){
+                this.logger.error(e);
+            }
+            global.logError(e);
+        }
         /* Get output from management app */
         this._read_manage_app_stdout();
+
     },
 };
 

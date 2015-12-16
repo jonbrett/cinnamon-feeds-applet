@@ -51,5 +51,11 @@
         "default" : true,
         "description" : "Show notifications for new items",
         "tooltip" : "If checked a popup notification will be displayed for new items"
+    },
+    "enable-verbose-logging" : {
+        "type" : "checkbox",
+        "default" : false,
+        "description" : "Check this to enable debug logging in Looking Glass",
+        "tooltip" : "Checking this will enable debug level logging"
     }
 }
