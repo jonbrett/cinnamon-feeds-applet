@@ -251,6 +251,8 @@ FeedDisplayMenuItem.prototype = {
 
     /* Rebuild the feed title, status, items from the feed reader */
     update: function() {
+        if(this.logger != undefined)
+            this.logger.debug("update");
 
         /* Clear existing actors */
         this.statusbox.destroy_all_children();
@@ -273,6 +275,8 @@ FeedDisplayMenuItem.prototype = {
 
                 this.mainbox.add(imagebox, { x_align: St.Align.START, x_fill: false });
             } catch (e) {
+                if(this.logger != undefined)
+                    this.logger.error(e);
                 global.logError("Failed to load feed icon: " + this.reader.image.path + ' : ' + e);
             }
         }
@@ -380,7 +384,18 @@ FeedApplet.prototype = {
     _init: function(metadata, orientation, panel_height, instance_id) {
         Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
 
+        // Initialize the settings early so we can use them
+        this.init_settings();
+
         try {
+            // Initialize a debug logger
+            this.logger = new Logger.Logger({
+                uuid: UUID,
+                verbose: this.settings.getValue("enable-verbose-logging")
+            });
+
+            this.logger.debug("Loading applet Debug logging enabled.");
+
             this.feeds = new Array();
             this.path = metadata.path;
             this.icon_path = metadata.path + '/icons/';
@@ -388,21 +403,20 @@ FeedApplet.prototype = {
             this.set_applet_icon_symbolic_name("rss");
             this.set_applet_tooltip(_("Feed reader"));
 
+            this.logger.debug("Creating menus");
             this.menuManager = new PopupMenu.PopupMenuManager(this);
             this.menu = new Applet.AppletPopupMenu(this, orientation);
             this.menuManager.addMenu(this.menu);
 
             this.feed_file_error = false;
-
-
-
+            this.url_changed();
         } catch (e) {
+            // Just in-case the logger is the issue.
+            if(this.logger != undefined){
+                this.logger.error(e);
+            }
             global.logError(e);
         }
-
-        this.init_settings();
-
-        this.logger.debug("Loading feeds@jonbrettdev.wordpress.com with Debug logging enabled.");
 
         this.build_context_menu();
         this.update();
@@ -452,16 +466,10 @@ FeedApplet.prototype = {
                 "url_list_str",
                 this.url_changed,
                 null);
-
-        this.logger = new Logger.Logger({
-            uuid: UUID,
-            verboseLogging: this.settings.getValue("enable-verbose-logging")
-        });
-
-        this.url_changed();
     },
 
     build_context_menu: function() {
+        this.logger.debug("build_context_menu");
         var s = new Applet.MenuItem(
                 _("Mark all read"),
                 "object-select-symbolic",
@@ -502,35 +510,46 @@ FeedApplet.prototype = {
     /* Converts a settings string into an array of objects, each containing a
      * url and title property */
     parse_feed_urls: function(str) {
+        this.logger.debug("parse_feed_urls");
         let lines = str.split("\n");
         let url_list = new Array();
 
         for (var i in lines) {
-            /* Strip redundant (leading,trailing,multiple) whitespace */
-            lines[i] = lines[i].trim().replace(/\s+/g, " ");
+            this.logger.debug("Parsing: " + lines[i]);
+            try{
+                /* Strip redundant (leading,trailing,multiple) whitespace */
+                lines[i] = lines[i].trim().replace(/\s+/g, " ");
 
-            /* Skip empty lines and lines starting with '#' */
-            if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
-                continue;
+                /* Skip empty lines and lines starting with '#' */
+                if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
+                    continue;
 
-            /* URL is the first word on the line, the rest of the line is an
-             * optional title */
-            url_list.push({
-                url: lines[i].split(" ")[0],
-                title: lines[i].split(" ").slice(1).join(" ")
-            });
+                /* URL is the first word on the line, the rest of the line is an
+                 * optional title */
+                url_list.push({
+                    url: lines[i].split(" ")[0],
+                    title: lines[i].split(" ").slice(1).join(" ")
+                });
+            }
+            catch(e){
+                if(this.logger != undefined)
+                    this.logger.error(e);
+                global.log(e.toString());
+            }
         }
 
         return url_list;
     },
 
     url_changed: function() {
+        this.logger.debug("url_changed");
         let url_list = this.parse_feed_urls(this.url_list_str);
         this.on_feeds_changed(url_list);
     },
 
     // called when feeds have been added or removed
     on_feeds_changed: function(url_list) {
+        this.logger.debug("on_feeds_changed (url_list)");
         this.feeds = new Array();
 
         this.menu.removeAll();
@@ -556,6 +575,7 @@ FeedApplet.prototype = {
      * feed info (e.g. unread count, title).  Updates the
      * applet icon and tooltip */
     update: function() {
+        this.logger.debug("update");
         let unread_count = 0;
         let tooltip = "";
 
@@ -575,6 +595,7 @@ FeedApplet.prototype = {
     },
 
     on_settings_changed: function() {
+        this.logger.debug("on_settings_changed");
         for (var i = 0; i < this.feeds.length; i++) {
             this.feeds[i].on_settings_changed({
                     max_items: this.max_items,
@@ -587,12 +608,13 @@ FeedApplet.prototype = {
     },
 
     refresh: function() {
+        this.logger.debug("Removing previous timer");
         /* Remove any previous timeout */
         if (this.timer_id) {
             Mainloop.source_remove(this.timer_id);
             this.timer_id = 0;
         }
-
+        this.logger.debug("Updating all feed display items");
         /* Update all feed display items */
         for (var i = 0; i < this.feeds.length; i++) {
             this.feeds[i].refresh();
@@ -601,21 +623,25 @@ FeedApplet.prototype = {
         /* Convert refresh interval from mins -> ms */
         this.timeout = this.refresh_interval_mins * 60 * 1000;
 
+        this.logger.debug("Setting next timeout to: " + this.timeout + " ms");
         /* Set the next timeout */
         this.timer_id = Mainloop.timeout_add(this.timeout,
                 Lang.bind(this, this.refresh));
     },
 
     on_applet_clicked: function(event) {
+        this.logger.debug("on_applet_clicked");
         this.menu.toggle();
         this.toggle_submenus(null);
     },
 
     new_item_notification: function(feedtitle, itemtitle) {
+        this.logger.debug("new_item_notification");
         /* Displays a popup notification using notify-send */
 
         // if notifications are disabled don't do anything
         if(!this.notifications_enabled) {
+            this.logger.debug("Notifications Disabled");
             return;
         }
 
@@ -623,10 +649,13 @@ FeedApplet.prototype = {
 
         let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
 
+        this.logger.debug("Executing Command: " + command);
         GLib.spawn_command_line_async(command);
     },
 
     toggle_submenus: function(feed_to_show) {
+        this.logger.debug("toggle_submenu");
+
         if (feed_to_show != null)
             this.feed_to_show = feed_to_show;
 
@@ -640,6 +669,7 @@ FeedApplet.prototype = {
     },
 
     _read_manage_app_stdout: function() {
+        this.logger.debug("_read_manage_app_stdout");
         /* Asynchronously wait for stdout of management app */
         this._manage_data_stdout.fill_async(-1, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(stream, result) {
             if (stream.fill_finish(result) == 0) {
@@ -665,7 +695,10 @@ FeedApplet.prototype = {
 
     /* Feed manager functions */
     manage_feeds: function() {
+        this.logger.debug("manage_feeds");
         try {
+
+
             let argv = [this.path + "/manage_feeds.py"];
             let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
                     null,
