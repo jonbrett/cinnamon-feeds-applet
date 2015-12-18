@@ -46,6 +46,387 @@ const _ = Gettext.gettext;
 
 const Logger = imports.logger;
 
+/*  Application hook */
+function main(metadata, orientation, panel_height, instance_id) {
+    return new FeedApplet(metadata, orientation, panel_height, instance_id);
+}
+
+/* constructor for applet */
+function FeedApplet() {
+    this._init.apply(this, arguments);
+}
+
+/* Applet */
+FeedApplet.prototype = {
+    __proto__: Applet.IconApplet.prototype,
+
+    _init: function(metadata, orientation, panel_height, instance_id) {
+        Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
+
+        // Initialize the settings early so we can use them
+        this.init_settings();
+
+        try {
+            // Initialize a debug logger
+            this.logger = new Logger.Logger({
+                uuid: UUID,
+                verbose: this.settings.getValue("enable-verbose-logging")
+            });
+
+            this.logger.debug("Loading applet Debug logging enabled.");
+
+            this.feeds = new Array();
+            this.path = metadata.path;
+            this.icon_path = metadata.path + '/icons/';
+            Gtk.IconTheme.get_default().append_search_path(this.icon_path);
+            this.set_applet_icon_symbolic_name("rss");
+            this.set_applet_tooltip(_("Feed reader"));
+
+            this.logger.debug("Creating menus");
+            this.menuManager = new PopupMenu.PopupMenuManager(this);
+            this.menu = new Applet.AppletPopupMenu(this, orientation);
+            this.menuManager.addMenu(this.menu);
+
+            this.feed_file_error = false;
+            this.url_changed();
+        } catch (e) {
+            // Just in-case the logger is the issue.
+            if(this.logger != undefined){
+                this.logger.error(e);
+            }
+            global.logError(e);
+        }
+
+        this.build_context_menu();
+        this.update();
+    },
+
+    init_settings: function(instance_id) {
+        this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "refresh_interval",
+                "refresh_interval_mins",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_read_items",
+                "show_read_items",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "max_items",
+                "max_items",
+                this.update_params,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "show_feed_image",
+                "show_feed_image",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "notifications_enabled",
+                "notifications_enabled",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.IN,
+                "enable-verbose-logging",
+                "enable_verbose_logging",
+                this.on_settings_changed,
+                null);
+
+        this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
+                "url",
+                "url_list_str",
+                this.url_changed,
+                null);
+    },
+
+    build_context_menu: function() {
+        this.logger.debug("build_context_menu");
+        var s = new Applet.MenuItem(
+                _("Mark all read"),
+                "object-select-symbolic",
+                Lang.bind(this, function() {
+                    for (var i = 0; i < this.feeds.length; i++)
+                        this.feeds[i].mark_all_items_read();
+                }));
+        this._applet_context_menu.addMenuItem(s);
+
+        var s = new Applet.MenuItem(
+                _("Reload"),
+                "view-refresh-symbolic",
+                Lang.bind(this, function() {
+                    this.logger.debug("view-refresh-symbolic calling refresh");
+                    this.refresh_tick();
+                }));
+        this._applet_context_menu.addMenuItem(s);
+
+        var s = new Applet.MenuItem(
+                _("Manage feeds"),
+                "document-properties-symbolic",
+                Lang.bind(this, function() {
+                    this.manage_feeds();
+                }));
+        this._applet_context_menu.addMenuItem(s);
+
+        /* Include setting menu item in Cinnamon < 2.0.0 */
+        if (!cinnamon_version_gte('2.0.0')) {
+            s = new Applet.MenuItem(
+                    _("Settings"),
+                    "emblem-system-symbolic",
+                    Lang.bind(this, function() {
+                        Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
+                    }));
+            this._applet_context_menu.addMenuItem(s);
+        }
+    },
+
+    /* Converts a settings string into an array of objects, each containing a
+     * url and title property */
+    parse_feed_urls: function(str) {
+        this.logger.debug("parse_feed_urls");
+        let lines = str.split("\n");
+        let url_list = new Array();
+
+        for (var i in lines) {
+            this.logger.debug("Parsing: " + lines[i]);
+            try{
+                /* Strip redundant (leading,trailing,multiple) whitespace */
+                lines[i] = lines[i].trim().replace(/\s+/g, " ");
+
+                /* Skip empty lines and lines starting with '#' */
+                if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
+                    continue;
+
+                /* URL is the first word on the line, the rest of the line is an
+                 * optional title */
+                url_list.push({
+                    url: lines[i].split(" ")[0],
+                    title: lines[i].split(" ").slice(1).join(" ")
+                });
+            }
+            catch(e){
+                if(this.logger != undefined)
+                    this.logger.error(e);
+                global.log(e.toString());
+            }
+        }
+
+        return url_list;
+    },
+
+    url_changed: function() {
+        this.logger.debug("url_changed");
+        let url_list = this.parse_feed_urls(this.url_list_str);
+        this.on_feeds_changed(url_list);
+    },
+
+    // called when feeds have been added or removed
+    on_feeds_changed: function(url_list) {
+        this.logger.debug("on_feeds_changed (url_list)");
+        this.feeds = new Array();
+
+        this.menu.removeAll();
+
+        for(var i = 0; i < url_list.length; i++) {
+            this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
+                    {
+                        logger: this.logger,
+                        max_items: this.max_items,
+                        show_read_items: this.show_read_items,
+                        show_feed_image: this.show_feed_image,
+                        custom_title: url_list[i].title
+                    });
+            this.menu.addMenuItem(this.feeds[i]);
+        }
+
+        if (this.feeds.length > 0)
+            this.feed_to_show = this.feeds[0];
+
+        this.logger.debug("on_feeds_changed calling refresh");
+        this.refresh_tick();
+    },
+
+    /* Called by Feed Display items to notify of changes to
+     * feed info (e.g. unread count, title).  Updates the
+     * applet icon and tooltip */
+    update: function() {
+        this.logger.debug("update");
+        let unread_count = 0;
+        let tooltip = "";
+
+        for (var i = 0; i < this.feeds.length; i++) {
+            unread_count += this.feeds[i].get_unread_count();
+            if (i != 0)
+                tooltip += "\n";
+            tooltip += this.feeds[i].get_title() + "[" + this.feeds[i].get_unread_count() + "]";
+        }
+
+        if (unread_count > 0)
+            this.set_applet_icon_symbolic_name("feed-new");
+        else
+            this.set_applet_icon_symbolic_name("feed");
+
+        this.set_applet_tooltip(tooltip);
+    },
+
+    on_settings_changed: function() {
+        this.logger.debug("on_settings_changed");
+        for (var i = 0; i < this.feeds.length; i++) {
+            this.feeds[i].on_settings_changed({
+                    max_items: this.max_items,
+                    show_read_items: this.show_read_items,
+                    show_feed_image: this.show_feed_image
+            });
+            this.feeds[i].update();
+        }
+        this.logger.verboseLogging = this.settings.getValue("enable-verbose-logging");
+
+        this.logger.debug("on_settings_changed calling refresh");
+        this.refresh_tick();
+    },
+    /* renamed to refresh_tick to prevent this from being called repeatedly by somewhere */
+    refresh_tick: function() {
+        this.logger.debug("Removing previous timer: " + this.timer_id);
+        /* Remove any previous timeout */
+        if (this.timer_id) {
+            Mainloop.source_remove(this.timer_id);
+            this.timer_id = 0;
+        }
+        this.logger.debug("Updating all feed display items");
+        /* Update all feed display items */
+        for (var i = 0; i < this.feeds.length; i++) {
+            this.feeds[i].refresh();
+        }
+
+        /* Convert refresh interval from mins -> ms */
+        this.timeout = this.refresh_interval_mins * 60 * 1000;
+
+        this.logger.debug("Setting next timeout to: " + this.timeout + " ms");
+        /* Set the next timeout */
+        this.timer_id = Mainloop.timeout_add(this.timeout,
+                Lang.bind(this, this.refresh_tick));
+
+        this.logger.debug("timer_id: " + this.timer_id);
+    },
+
+    on_applet_clicked: function(event) {
+        this.logger.debug("on_applet_clicked");
+        this.menu.toggle();
+        this.toggle_submenus(null);
+    },
+
+    new_item_notification: function(feedtitle, itemtitle) {
+        if(this.logger == undefined)
+            global.log("Undefined Logger p2")
+        this.logger.debug("new_item_notification");
+        /* Displays a popup notification using notify-send */
+
+        // if notifications are disabled don't do anything
+        if(!this.notifications_enabled) {
+            this.logger.debug("Notifications Disabled");
+            return;
+        }
+
+        let iconpath = this.path + "/icon.png";
+
+        let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
+
+        this.logger.debug("Executing Command: " + command);
+        GLib.spawn_command_line_async(command);
+    },
+
+    toggle_submenus: function(feed_to_show) {
+        this.logger.debug("toggle_submenu");
+
+        if (feed_to_show != null)
+            this.feed_to_show = feed_to_show;
+
+        for (i in this.feeds) {
+            if (this.feed_to_show == this.feeds[i]) {
+                this.feeds[i].menu.open(true);
+            } else {
+                this.feeds[i].menu.close(true);
+            }
+        }
+    },
+
+    _read_manage_app_stdout: function() {
+        this.logger.debug("_read_manage_app_stdout");
+        /* Asynchronously wait for stdout of management app */
+        this._manage_data_stdout.fill_async(-1, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(stream, result) {
+            if (stream.fill_finish(result) == 0) {
+                try {
+                    let read = stream.peek_buffer().toString();
+                    if (read.length > 0) {
+                        this.url_list_str = read;
+                        this.url_changed();
+                    }
+                } catch(e) {
+                    this.logger.error(e);
+                    global.log(e.toString());
+                }
+                this._manage_stdout.close(null)
+            } else {
+                /* Not enough space in stream buffer for all the output#
+                 * Double it and retry */
+                stream.set_buffer_size(2 * stream.get_buffer_size());
+                this._read_manage_app_stdout();
+            }
+        }));
+    },
+
+    /* Feed manager functions */
+    manage_feeds: function() {
+        this.logger.debug("manage_feeds");
+        try {
+
+
+            let argv = [this.path + "/manage_feeds.py"];
+            let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
+                    null,
+                    argv,
+                    null,
+                    GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                    null);
+
+            /* Store stdin, stdout but close stderr */
+            this._manage_stdout = new Gio.UnixInputStream({fd: stdout, close_fd: true});
+            this._manage_data_stdout = new Gio.DataInputStream({
+                base_stream: this._manage_stdout
+            });
+            this._manage_stdin = new Gio.UnixOutputStream({fd: stdin, close_fd: true});
+            this._manage_data_stdin = new Gio.DataOutputStream({
+                base_stream: this._manage_stdin
+            });
+            new Gio.UnixInputStream({fd: stderr, close_fd: true}).close(null);
+
+            /* Write current feeds list to management app stdin */
+            this._manage_data_stdin.put_string(this.url_list_str, null);
+            this._manage_stdin.close(null);
+        }
+        catch (e) {
+            if(this.logger != undefined){
+                this.logger.error(e);
+            }
+            global.logError(e);
+        }
+        /* Get output from management app */
+        this._read_manage_app_stdout();
+
+    },
+};
+
+
+
+
+
 /* Check if current Cinnamon version is greater than or equal to a specific
  * version */
 function cinnamon_version_gte(version) {
@@ -174,7 +555,7 @@ FeedDisplayMenuItem.prototype = {
 
     _init: function (url, owner, params) {
         PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, _("Loading feed"));
-
+        this.logger = params.logger;
         this.owner = owner;
         this.max_items = params.max_items;
         this.show_feed_image = params.show_feed_image;
@@ -182,8 +563,10 @@ FeedDisplayMenuItem.prototype = {
         this.unread_count = 0;
         this.custom_title = params.custom_title;
 
+        this.logger.debug("Loading FeedReader url: " + url);
         /* Create reader */
         this.reader = new FeedReader.FeedReader(
+                this.logger,
                 url,
                 '~/.cinnamon/' + UUID + '/' + owner.instance_id,
                 {
@@ -237,6 +620,7 @@ FeedDisplayMenuItem.prototype = {
     },
 
     refresh: function() {
+        this.logger.debug("FeedDisplayMenuItem.refresh");
         this.reader.get();
     },
 
@@ -251,8 +635,7 @@ FeedDisplayMenuItem.prototype = {
 
     /* Rebuild the feed title, status, items from the feed reader */
     update: function() {
-        if(this.logger != undefined)
-            this.logger.debug("update");
+        this.logger.debug("FeedDisplayMenuItem.update");
 
         /* Clear existing actors */
         this.statusbox.destroy_all_children();
@@ -302,6 +685,9 @@ FeedDisplayMenuItem.prototype = {
         button.set_child(icon);
         button.url = this.url;
         button.connect('clicked', Lang.bind(this, function(button, event) {
+            if(this.logger == undefined)
+                global.log("logger undefined p1");
+            this.logger.debug("FeedDisplayMenuItem.xdg-open Feed: " + this.reader.link);
             Util.spawnCommandLine('xdg-open ' + this.reader.link);
             this.owner.menu.close();
         }));
@@ -330,6 +716,7 @@ FeedDisplayMenuItem.prototype = {
             width = MIN_MENU_WIDTH;
         }
 
+        this.logger.debug("FeedDisplayMenuItem.Finding unread items");
         let menu_items = 0;
         this.unread_count = 0;
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
@@ -341,6 +728,7 @@ FeedDisplayMenuItem.prototype = {
 
             let item = new FeedMenuItem(this.reader.items[i], width);
             item.connect('item-read', Lang.bind(this, function () { this.update(); }));
+            this.logger.debug("Adding item: " + item);
             this.menu.addMenuItem(item);
 
             menu_items++;
@@ -374,366 +762,3 @@ FeedDisplayMenuItem.prototype = {
     },
 };
 
-function FeedApplet() {
-    this._init.apply(this, arguments);
-}
-
-FeedApplet.prototype = {
-    __proto__: Applet.IconApplet.prototype,
-
-    _init: function(metadata, orientation, panel_height, instance_id) {
-        Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
-
-        // Initialize the settings early so we can use them
-        this.init_settings();
-
-        try {
-            // Initialize a debug logger
-            this.logger = new Logger.Logger({
-                uuid: UUID,
-                verbose: this.settings.getValue("enable-verbose-logging")
-            });
-
-            this.logger.debug("Loading applet Debug logging enabled.");
-
-            this.feeds = new Array();
-            this.path = metadata.path;
-            this.icon_path = metadata.path + '/icons/';
-            Gtk.IconTheme.get_default().append_search_path(this.icon_path);
-            this.set_applet_icon_symbolic_name("rss");
-            this.set_applet_tooltip(_("Feed reader"));
-
-            this.logger.debug("Creating menus");
-            this.menuManager = new PopupMenu.PopupMenuManager(this);
-            this.menu = new Applet.AppletPopupMenu(this, orientation);
-            this.menuManager.addMenu(this.menu);
-
-            this.feed_file_error = false;
-            this.url_changed();
-        } catch (e) {
-            // Just in-case the logger is the issue.
-            if(this.logger != undefined){
-                this.logger.error(e);
-            }
-            global.logError(e);
-        }
-
-        this.build_context_menu();
-        this.update();
-    },
-
-    init_settings: function(instance_id) {
-        this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
-
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "refresh_interval",
-                "refresh_interval_mins",
-                this.refresh,
-                null);
-
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "show_read_items",
-                "show_read_items",
-                this.on_settings_changed,
-                null);
-
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "max_items",
-                "max_items",
-                this.update_params,
-                null);
-
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "show_feed_image",
-                "show_feed_image",
-                this.on_settings_changed,
-                null);
-
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "notifications_enabled",
-                "notifications_enabled",
-                this.on_settings_changed,
-                null);
-
-        this.settings.bindProperty(Settings.BindingDirection.IN,
-                "enable-verbose-logging",
-                "enable_verbose_logging",
-                this.on_settings_changed,
-                null);
-
-        this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
-                "url",
-                "url_list_str",
-                this.url_changed,
-                null);
-    },
-
-    build_context_menu: function() {
-        this.logger.debug("build_context_menu");
-        var s = new Applet.MenuItem(
-                _("Mark all read"),
-                "object-select-symbolic",
-                Lang.bind(this, function() {
-                    for (var i = 0; i < this.feeds.length; i++)
-                        this.feeds[i].mark_all_items_read();
-                }));
-        this._applet_context_menu.addMenuItem(s);
-
-        var s = new Applet.MenuItem(
-                _("Reload"),
-                "view-refresh-symbolic",
-                Lang.bind(this, function() {
-                    this.refresh();
-                }));
-        this._applet_context_menu.addMenuItem(s);
-
-        var s = new Applet.MenuItem(
-                _("Manage feeds"),
-                "document-properties-symbolic",
-                Lang.bind(this, function() {
-                    this.manage_feeds();
-                }));
-        this._applet_context_menu.addMenuItem(s);
-
-        /* Include setting menu item in Cinnamon < 2.0.0 */
-        if (!cinnamon_version_gte('2.0.0')) {
-            s = new Applet.MenuItem(
-                    _("Settings"),
-                    "emblem-system-symbolic",
-                    Lang.bind(this, function() {
-                        Util.spawnCommandLine('cinnamon-settings applets ' + UUID);
-                    }));
-            this._applet_context_menu.addMenuItem(s);
-        }
-    },
-
-    /* Converts a settings string into an array of objects, each containing a
-     * url and title property */
-    parse_feed_urls: function(str) {
-        this.logger.debug("parse_feed_urls");
-        let lines = str.split("\n");
-        let url_list = new Array();
-
-        for (var i in lines) {
-            this.logger.debug("Parsing: " + lines[i]);
-            try{
-                /* Strip redundant (leading,trailing,multiple) whitespace */
-                lines[i] = lines[i].trim().replace(/\s+/g, " ");
-
-                /* Skip empty lines and lines starting with '#' */
-                if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
-                    continue;
-
-                /* URL is the first word on the line, the rest of the line is an
-                 * optional title */
-                url_list.push({
-                    url: lines[i].split(" ")[0],
-                    title: lines[i].split(" ").slice(1).join(" ")
-                });
-            }
-            catch(e){
-                if(this.logger != undefined)
-                    this.logger.error(e);
-                global.log(e.toString());
-            }
-        }
-
-        return url_list;
-    },
-
-    url_changed: function() {
-        this.logger.debug("url_changed");
-        let url_list = this.parse_feed_urls(this.url_list_str);
-        this.on_feeds_changed(url_list);
-    },
-
-    // called when feeds have been added or removed
-    on_feeds_changed: function(url_list) {
-        this.logger.debug("on_feeds_changed (url_list)");
-        this.feeds = new Array();
-
-        this.menu.removeAll();
-
-        for(var i = 0; i < url_list.length; i++) {
-            this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
-                    {
-                        max_items: this.max_items,
-                        show_read_items: this.show_read_items,
-                        show_feed_image: this.show_feed_image,
-                        custom_title: url_list[i].title
-                    });
-            this.menu.addMenuItem(this.feeds[i]);
-        }
-
-        if (this.feeds.length > 0)
-            this.feed_to_show = this.feeds[0];
-
-        this.refresh();
-    },
-
-    /* Called by Feed Display items to notify of changes to
-     * feed info (e.g. unread count, title).  Updates the
-     * applet icon and tooltip */
-    update: function() {
-        this.logger.debug("update");
-        let unread_count = 0;
-        let tooltip = "";
-
-        for (var i = 0; i < this.feeds.length; i++) {
-            unread_count += this.feeds[i].get_unread_count();
-            if (i != 0)
-                tooltip += "\n";
-            tooltip += this.feeds[i].get_title() + "[" + this.feeds[i].get_unread_count() + "]";
-        }
-
-        if (unread_count > 0)
-            this.set_applet_icon_symbolic_name("feed-new");
-        else
-            this.set_applet_icon_symbolic_name("feed");
-
-        this.set_applet_tooltip(tooltip);
-    },
-
-    on_settings_changed: function() {
-        this.logger.debug("on_settings_changed");
-        for (var i = 0; i < this.feeds.length; i++) {
-            this.feeds[i].on_settings_changed({
-                    max_items: this.max_items,
-                    show_read_items: this.show_read_items,
-                    show_feed_image: this.show_feed_image
-            });
-            this.feeds[i].update();
-        }
-        this.logger.verboseLogging = this.settings.getValue("enable-verbose-logging");
-    },
-
-    refresh: function() {
-        this.logger.debug("Removing previous timer");
-        /* Remove any previous timeout */
-        if (this.timer_id) {
-            Mainloop.source_remove(this.timer_id);
-            this.timer_id = 0;
-        }
-        this.logger.debug("Updating all feed display items");
-        /* Update all feed display items */
-        for (var i = 0; i < this.feeds.length; i++) {
-            this.feeds[i].refresh();
-        }
-
-        /* Convert refresh interval from mins -> ms */
-        this.timeout = this.refresh_interval_mins * 60 * 1000;
-
-        this.logger.debug("Setting next timeout to: " + this.timeout + " ms");
-        /* Set the next timeout */
-        this.timer_id = Mainloop.timeout_add(this.timeout,
-                Lang.bind(this, this.refresh));
-    },
-
-    on_applet_clicked: function(event) {
-        this.logger.debug("on_applet_clicked");
-        this.menu.toggle();
-        this.toggle_submenus(null);
-    },
-
-    new_item_notification: function(feedtitle, itemtitle) {
-        this.logger.debug("new_item_notification");
-        /* Displays a popup notification using notify-send */
-
-        // if notifications are disabled don't do anything
-        if(!this.notifications_enabled) {
-            this.logger.debug("Notifications Disabled");
-            return;
-        }
-
-        let iconpath = this.path + "/icon.png";
-
-        let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
-
-        this.logger.debug("Executing Command: " + command);
-        GLib.spawn_command_line_async(command);
-    },
-
-    toggle_submenus: function(feed_to_show) {
-        this.logger.debug("toggle_submenu");
-
-        if (feed_to_show != null)
-            this.feed_to_show = feed_to_show;
-
-        for (i in this.feeds) {
-            if (this.feed_to_show == this.feeds[i]) {
-                this.feeds[i].menu.open(true);
-            } else {
-                this.feeds[i].menu.close(true);
-            }
-        }
-    },
-
-    _read_manage_app_stdout: function() {
-        this.logger.debug("_read_manage_app_stdout");
-        /* Asynchronously wait for stdout of management app */
-        this._manage_data_stdout.fill_async(-1, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(stream, result) {
-            if (stream.fill_finish(result) == 0) {
-                try {
-                    let read = stream.peek_buffer().toString();
-                    if (read.length > 0) {
-                        this.url_list_str = read;
-                        this.url_changed();
-                    }
-                } catch(e) {
-                    this.logger.error(e);
-                    global.log(e.toString());
-                }
-                this._manage_stdout.close(null)
-            } else {
-                /* Not enough space in stream buffer for all the output#
-                 * Double it and retry */
-                stream.set_buffer_size(2 * stream.get_buffer_size());
-                this._read_manage_app_stdout();
-            }
-        }));
-    },
-
-    /* Feed manager functions */
-    manage_feeds: function() {
-        this.logger.debug("manage_feeds");
-        try {
-
-
-            let argv = [this.path + "/manage_feeds.py"];
-            let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
-                    null,
-                    argv,
-                    null,
-                    GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-                    null);
-
-            /* Store stdin, stdout but close stderr */
-            this._manage_stdout = new Gio.UnixInputStream({fd: stdout, close_fd: true});
-            this._manage_data_stdout = new Gio.DataInputStream({
-                base_stream: this._manage_stdout
-            });
-            this._manage_stdin = new Gio.UnixOutputStream({fd: stdin, close_fd: true});
-            this._manage_data_stdin = new Gio.DataOutputStream({
-                base_stream: this._manage_stdin
-            });
-            new Gio.UnixInputStream({fd: stderr, close_fd: true}).close(null);
-
-            /* Write current feeds list to management app stdin */
-            this._manage_data_stdin.put_string(this.url_list_str, null);
-            this._manage_stdin.close(null);
-        }
-        catch (e) {
-            if(this.logger != undefined){
-                this.logger.error(e);
-            }
-            global.logError(e);
-        }
-        /* Get output from management app */
-        this._read_manage_app_stdout();
-
-    },
-};
-
-function main(metadata, orientation, panel_height, instance_id) {
-    return new FeedApplet(metadata, orientation, panel_height, instance_id);
-}

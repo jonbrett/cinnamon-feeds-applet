@@ -51,12 +51,14 @@ FeedItem.prototype = {
     },
 
     open: function() {
+        //this.reader.logger.debug("FeedItem.open");
         try {
             Util.spawnCommandLine('xdg-open ' + this.link);
         } catch (e) {
             global.logError(e);
         }
         this.mark_read();
+        //this.reader.logger.debug("FeedItem.open calling save_items");
         this.reader.save_items();
     },
 
@@ -71,18 +73,20 @@ function FeedReader() {
 
 FeedReader.prototype = {
 
-    _init: function(url, path, callbacks) {
+    _init: function(logger, url, path, callbacks) {
 
         this.url = url;
         this.path = path;
         this.callbacks = callbacks;
         this.error = false;
+        this.logger = logger;
 
         /* Feed data */
         this.title = "";
         this.items = new Array();
         this.read_list = new Array();
         this.image = {}
+
 
         /* Init HTTP session */
         try {
@@ -102,6 +106,7 @@ FeedReader.prototype = {
     },
     
     process_feed: function(response) {
+        this.logger.debug("feedreader.process_feed");
         this.info = JSON.parse(response);
         this.title = this.info.title;
         if (this.info.image) this.image = this.info.image;
@@ -147,12 +152,14 @@ FeedReader.prototype = {
     },
 
     mark_all_items_read: function() {
+        this.logger.debug("feedreader.mark_all_items_read");
         for (var i = 0; i < this.items.length; i++)
             this.items[i].mark_read();
         this.save_items();
     },
 
     save_items: function() {
+        this.logger.debug("feedreader.save_items");
         try {
             var dir = Gio.file_parse_name(this.path);
             if (!dir.query_exists(null)) {
@@ -163,7 +170,11 @@ FeedReader.prototype = {
              * I found escaping the string helps to deal with special
              * characters, which could cause problems when parsing the file
              * later */
-            var file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url));
+            var filename = this.path + '/' + sanitize_url(this.url);
+            this.logger.debug("saving feed data to: " + filename);
+
+            var file = Gio.file_parse_name(filename);
+
             var fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 
@@ -190,6 +201,7 @@ FeedReader.prototype = {
     },
 
     load_items: function() {
+        this.logger.debug("feedreader.load_items");
         try {
             let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
             var content = Cinnamon.get_file_contents_utf8_sync(path);
@@ -222,6 +234,7 @@ FeedReader.prototype = {
     },
 
     _fetch_image: function() {
+        this.logger.debug("feedreader._fetch_image");
         if (this.image.url == undefined || this.image.url == '')
             return;
 
@@ -239,6 +252,7 @@ FeedReader.prototype = {
     },
 
     _on_img_response: function(session, message) {
+        this.logger.debug("feedreader._on_img_response");
         if (message.status_code != 200) {
             global.logError('HTTP request for ' + this.url + ' returned ' + message.status_code);
             return;
@@ -290,8 +304,7 @@ FeedReader.prototype = {
      * Log error state and report to application
      */
     on_error: function(msg, details) {
-        global.logError("Feedreader (" + this.url +"): " + msg);
-
+        this.logger.error("Feedreader (" + this.url +"): " + msg);
         this.error = true;
         this.error_messsage = msg;
         this.error_details = details;
