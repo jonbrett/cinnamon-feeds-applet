@@ -49,25 +49,25 @@ class MainWindow(Gtk.Window):
         self.treeview = Gtk.TreeView(model=self.feeds)
         self.treeview.set_reorderable(True)
 
-        renderer_url= Gtk.CellRendererText()
+        renderer_enable = Gtk.CellRendererToggle()
+        renderer_enable.connect("toggled", self.enable_toggled)
+        column_enable = Gtk.TreeViewColumn("Enable", renderer_enable, active=2)
+        column_enable.set_expand(False)
+        self.treeview.append_column(column_enable)
+
+        renderer_url = Gtk.CellRendererText()
         renderer_url.set_property("editable", True)
         renderer_url.connect("edited", self.url_edited)
         column_url = Gtk.TreeViewColumn("Url", renderer_url, text=0)
         column_url.set_expand(True)
         self.treeview.append_column(column_url)
 
-        renderer_title= Gtk.CellRendererText()
+        renderer_title = Gtk.CellRendererText()
         renderer_title.set_property("editable", True)
         renderer_title.connect("edited", self.title_edited)
         column_title = Gtk.TreeViewColumn("Custom title", renderer_title, text=1)
         column_title.set_expand(True)
         self.treeview.append_column(column_title)
-
-        renderer_enable = Gtk.CellRendererToggle()
-        renderer_enable.connect("toggled", self.enable_toggled)
-        column_enable = Gtk.TreeViewColumn("Enable", renderer_enable, active=2)
-        column_enable.set_expand(False)
-        self.treeview.append_column(column_enable)
 
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC,
@@ -242,6 +242,12 @@ class MainWindow(Gtk.Window):
         else:
             f = open(filename, mode="w", encoding="utf-8")
 
+        # Need to check if all feeds have been removed
+        if len(self.feeds) == 0:
+            f.write(u'#')
+            f.write('')
+            f.write(u'\n')
+
         for feed in self.feeds:
             if not feed[2]:
                 f.write(u'#')
@@ -297,7 +303,7 @@ class MainWindow(Gtk.Window):
             for outline in root.findall(".//outline[@type='rss']"):
                 new_feeds.append([
                         unicode(outline.attrib.get('xmlUrl', '')),
-                        unicode(outline.attrib.get('text','')),
+                        unicode(outline.attrib.get('text','')).encode('ascii', 'ignore'),
                         False])
         except Exception as e:
             dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
