@@ -29,7 +29,7 @@ imports.searchPath.push( imports.ui.appletManager.appletMeta[UUID].path );
 
 const Applet = imports.ui.applet;
 const Cinnamon = imports.gi.Cinnamon;
-const Config = imports.misc.config;
+const CinnamonVersion=imports.misc.config.PACKAGE_VERSION;
 const FeedReader = imports.feedreader;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -67,13 +67,15 @@ FeedApplet.prototype = {
         this.init_settings();
 
         try {
+            debug_logging = this.settings.getValue("enable-verbose-logging");
+
             // Initialize a debug logger
             this.logger = new Logger.Logger({
                 uuid: UUID,
-                verbose: this.settings.getValue("enable-verbose-logging")
+                verbose: debug_logging
             });
 
-            this.logger.debug("Loading applet Debug logging enabled.");
+            this.logger.info("Logging set at " + ((debug_logging) ? "debug" : "info"));
 
             this.feeds = new Array();
             this.path = metadata.path;
@@ -176,7 +178,8 @@ FeedApplet.prototype = {
         this._applet_context_menu.addMenuItem(s);
 
         /* Include setting menu item in Cinnamon < 2.0.0 */
-        if (!cinnamon_version_gte('2.0.0')) {
+        this.logger.info("Cinnamon Version: " + CinnamonVersion);
+        if (parseInt(CinnamonVersion) == 1) {
             s = new Applet.MenuItem(
                     _("Settings"),
                     "emblem-system-symbolic",
@@ -234,6 +237,8 @@ FeedApplet.prototype = {
 
         this.menu.removeAll();
 
+        // Feed Level Menu Items Added Here (each Feed includes posts).
+
         for(var i = 0; i < url_list.length; i++) {
             this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
@@ -286,9 +291,14 @@ FeedApplet.prototype = {
             });
             this.feeds[i].update();
         }
-        this.logger.verboseLogging = this.settings.getValue("enable-verbose-logging");
 
-        this.logger.debug("on_settings_changed calling refresh");
+        logging_level = this.settings.getValue("enable-verbose-logging");
+        // notify only when the logging level has changed.
+        if(this.logger.verbose != logging_level){
+            this.logger.info("Logging changed to " + ((this.logger.verbose) ? "debug" : "info"));
+            this.logger.verbose = logging_level;
+        }
+
         this.refresh_tick();
     },
     /* renamed to refresh_tick to prevent this from being called repeatedly by somewhere */
@@ -422,27 +432,6 @@ FeedApplet.prototype = {
 
     },
 };
-
-
-
-
-
-/* Check if current Cinnamon version is greater than or equal to a specific
- * version */
-function cinnamon_version_gte(version) {
-    let current = Config.PACKAGE_VERSION.split('.').map(function(x) { return parseInt(x); });
-    let required = version.split('.').map(function(x) { return parseInt(x); });
-
-    for (i in required) {
-        if (required[i] > current[i])
-            return false;
-        if (required[i] < current[i])
-            return true;
-    }
-
-    /* If we get here, the versions match exactly */
-    return true;
-}
 
 /* Menu item for displaying a simple message */
 function LabelMenuItem() {
