@@ -207,10 +207,12 @@ FeedReader.prototype = {
             var content = Cinnamon.get_file_contents_utf8_sync(path);
         } catch (e) {
             /* This is fine for new feeds */
+            this.logger.debug("No file found - Assuming new feed.")
             return;
         }
 
         try {
+            this.logger.debug("Loading already fetched feed items");
             var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {
