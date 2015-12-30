@@ -496,7 +496,6 @@ FeedDisplayMenuItem.prototype = {
         //PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, this.rssTitle);
         this._title.set_text(this.rssTitle);
 
-
         this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
         Mainloop.idle_add(Lang.bind(this, this.update));
@@ -539,10 +538,12 @@ FeedDisplayMenuItem.prototype = {
             menu_items++;
         }
 
+        this.logger.debug("Link: " + this.reader.url);
+        let tooltip = new Tooltips.Tooltip(this.actor, this.reader.url);
+
         /* Append unread_count to title */
         if (this.unread_count > 0)
             this._title.set_text(this.get_title());
-            //this._title.set_text(_title.get_text() + " [" + this.unread_count + "]");
 
         this.owner.update();
     },
