@@ -305,6 +305,7 @@ FeedApplet.prototype = {
     /* renamed to refresh_tick to prevent this from being called repeatedly by somewhere */
     refresh_tick: function() {
         this.logger.debug("Removing previous timer: " + this.timer_id);
+        this.logger.debug(this.instance_id);
         /* Remove any previous timeout */
         if (this.timer_id) {
             Mainloop.source_remove(this.timer_id);
@@ -352,7 +353,7 @@ FeedApplet.prototype = {
     },
 
     toggle_submenus: function(feed_to_show) {
-        this.logger.debug("toggle_submenu");
+        this.logger.debug("toggle_submenus");
 
         if (feed_to_show != null)
             this.feed_to_show = feed_to_show;
@@ -430,6 +431,16 @@ FeedApplet.prototype = {
         this._read_manage_app_stdout();
 
     },
+
+    on_applet_removed_from_panel: function() {
+        /* Clean up the timer so if the feed applet is removed it stops firing requests.  */
+        this.logger.debug("Removed from panel event");
+        if (this.timer_id) {
+            this.logger.debug("Removing Timer with ID: " + this.timer_id);
+            Mainloop.source_remove(this.timer_id);
+            this.timer_id = 0;
+        }
+    }
 };
 
 /* Menu item for displaying the feed title*/
@@ -442,9 +453,9 @@ FeedDisplayMenuItem.prototype = {
 
     _init: function (url, owner, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+        this.show_action_items = false;
 
-
-       this._title = new St.Label({ text: "loading",
+        this._title = new St.Label({ text: "loading",
             style_class: 'feedreader-title-label'
         });
 
@@ -493,10 +504,7 @@ FeedDisplayMenuItem.prototype = {
         else
             this.rssTitle = params.custom_title;
 
-        //PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, this.rssTitle);
         this._title.set_text(this.rssTitle);
-
-        this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
@@ -551,20 +559,62 @@ FeedDisplayMenuItem.prototype = {
         this.logger.debug("FeedDisplayMenuItem.refresh");
         this.reader.get();
     },
-    on_open_state_changed: function(menu, open) {
-        if (open)
-            this.owner.toggle_submenus(this);
-        else
-            this.owner.toggle_submenus(null);
-    },
-    /*
+
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("Button Pressed Event: " + event.get_button());
         if(event.get_button() == 3){
+            this.toggleMenu();
             return false;
         }
-        return true;
-    },*/
+
+        // Left click, toggle the menu if its not already open.
+        if (this.menu.open)
+            this.owner.toggle_submenus(this);
+        else
+            this.owner.toggle_submenus(null);
+
+        return false;
+    },
+    toggleMenu: function() {
+        // Try 1.. Add new submenu items at the top for "mark all read"
+        this.logger.debug("toggle sub menu options.");
+        if(!this.show_action_items){
+            // Add a new item to the top of the list.
+            this.logger.debug("adding Item");
+            this.menu.addMenuItem(new popupMenu.LabelMenuItem("FooBar"));
+            this.show_action_items = true;
+        } else {
+            // Remove the item.
+
+        }
+
+        /*
+        if (!this.menu.isOpen){
+            let children = this.menu.box.get_children();
+            for (var i in children) {
+                this.menu.box.remove_actor(children[i]);
+            }
+            let menuItem;
+            menuItem = new ApplicationContextMenuItem(this, _("Add to panel"), "add_to_panel");
+            this.menu.addMenuItem(menuItem);
+            if (USER_DESKTOP_PATH){
+                menuItem = new ApplicationContextMenuItem(this, _("Add to desktop"), "add_to_desktop");
+                this.menu.addMenuItem(menuItem);
+            }
+            if (AppFavorites.getAppFavorites().isFavorite(this.app.get_id())){
+                menuItem = new ApplicationContextMenuItem(this, _("Remove from favorites"), "remove_from_favorites");
+                this.menu.addMenuItem(menuItem);
+            }else{
+                menuItem = new ApplicationContextMenuItem(this, _("Add to favorites"), "add_to_favorites");
+                this.menu.addMenuItem(menuItem);
+            }
+            if (this.appsMenuButton._canUninstallApps) {
+                menuItem = new ApplicationContextMenuItem(this, _("Uninstall"), "uninstall");
+                this.menu.addMenuItem(menuItem);
+            }
+        }*/
+        //this.menu.toggle();
+    },
 };
 
 
