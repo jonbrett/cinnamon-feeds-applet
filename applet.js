@@ -43,8 +43,8 @@ const St = imports.gi.St;
 const Tooltips = imports.ui.tooltips;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
-
-const Logger = imports.logger;
+const Clutter = imports.gi.Clutter;
+const Logger = imports.log_util;
 
 /*  Application hook */
 function main(metadata, orientation, panel_height, instance_id) {
@@ -441,6 +441,33 @@ FeedDisplayMenuItem.prototype = {
     __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
     _init: function (url, owner, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+
+
+       this._title = new St.Label({ text: "loading",
+            style_class: 'feedreader-title-label'
+        });
+
+        this.addActor(this._title, {expand: true, align: St.Align.START});
+
+        this._triangleBin = new St.Bin({ x_align: St.Align.END });
+        this.addActor(this._triangleBin, { expand: true,
+                                           span: -1,
+                                           align: St.Align.END });
+
+        this._triangle = new St.Icon({ style_class: 'popup-menu-arrow',
+                              icon_name: 'pan-end',
+                              icon_type: St.IconType.SYMBOLIC,
+                              y_expand: true,
+                              y_align: Clutter.ActorAlign.CENTER,
+                              important: true });
+
+        this._triangle.pivot_point = new Clutter.Point({ x: 0.5, y: 0.6 });
+        this._triangleBin.child = this._triangle;
+
+        this.menu = new PopupMenu.PopupSubMenu(this.actor, this._triangle);
+        this.menu.actor.set_style_class_name('menu_context_menu');
+
         this.logger = params.logger;
         this.owner = owner;
         this.max_items = params.max_items;
@@ -466,7 +493,9 @@ FeedDisplayMenuItem.prototype = {
         else
             this.rssTitle = params.custom_title;
 
-        PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, this.rssTitle);
+        //PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this, this.rssTitle);
+        this._title.set_text(this.rssTitle);
+
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
 
@@ -474,7 +503,7 @@ FeedDisplayMenuItem.prototype = {
     },
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
-        title += "[" + this.unread_count + "]";
+        title += " [" + this.unread_count + "]";
         return title;
     },
     get_unread_count: function() {
@@ -510,6 +539,11 @@ FeedDisplayMenuItem.prototype = {
             menu_items++;
         }
 
+        /* Append unread_count to title */
+        if (this.unread_count > 0)
+            this._title.set_text(this.get_title());
+            //this._title.set_text(_title.get_text() + " [" + this.unread_count + "]");
+
         this.owner.update();
     },
     refresh: function() {
@@ -522,6 +556,14 @@ FeedDisplayMenuItem.prototype = {
         else
             this.owner.toggle_submenus(null);
     },
+    /*
+    _onButtonReleaseEvent: function (actor, event) {
+        this.logger.debug("Button Pressed Event: " + event.get_button());
+        if(event.get_button() == 3){
+            return false;
+        }
+        return true;
+    },*/
 };
 
 
