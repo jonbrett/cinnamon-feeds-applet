@@ -650,8 +650,12 @@ FeedMenuItem.prototype = {
 
         this.label = new St.Label({text: FeedReader.html2text(item.title)});
 
-        this.addActor(this.icon, {span: 0});
-        this.addActor(this.label, {expand: true, span: 1, align: St.Align.START});
+        let box = new St.BoxLayout();
+        box.set_width(MIN_MENU_WIDTH);
+
+        box.add(this.icon, {span: 0});
+        box.add(this.label, {expand: true, span: 1, align: St.Align.START});
+        this.addActor(box);
 
         this.tooltip = new Tooltips.Tooltip(this.actor,
                 FeedReader.html2text(item.title) + '\n\n' +
