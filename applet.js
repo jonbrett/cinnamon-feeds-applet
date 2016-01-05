@@ -18,7 +18,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-const UUID = "feeds@jonbrettdev.wordpress.com"
+const UUID = "feeds@jonbrettdev.wordpress.com";
 
 const FEED_IMAGE_HEIGHT_MAX = 100;
 const FEED_IMAGE_WIDTH_MAX = 200;
@@ -548,7 +548,8 @@ FeedDisplayMenuItem.prototype = {
         }
 
         this.logger.debug("Link: " + this.reader.url);
-        let tooltip = new Tooltips.Tooltip(this.actor, this.reader.url);
+        let tooltipText = "Right Click For Feed Options: \n" + this.reader.url;
+        let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
 
         /* Append unread_count to title */
         if (this.unread_count > 0)
@@ -563,16 +564,22 @@ FeedDisplayMenuItem.prototype = {
 
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("Button Pressed Event: " + event.get_button());
+        this.logger.debug();
+
         if(event.get_button() == 3){
             this.toggleMenu();
-            return false;
+            return true;
         }
 
-        // Left click, toggle the menu if its not already open.
-        if (this.menu.open)
-            this.owner.toggle_submenus(this);
-        else
-            this.owner.toggle_submenus(null);
+        if(event.get_button() == 1){
+            // Left click, toggle the menu if its not already open.
+            if (this.menu.open)
+                this.owner.toggle_submenus(this);
+            else
+                this.owner.toggle_submenus(null);
+
+            return true;
+        }
 
         return false;
     },
@@ -692,13 +699,28 @@ ApplicationContextMenuItem.prototype = {
     },
 
     activate: function(event){
+        global.log(this._action);
         switch(this._action){
             case "mark_all_read":
-                this.logger.debug("Marking all items read");
+                global.log("Marking all items read");
+                try {
+                    this._appButton.menu.close();
+                    this._appButton.reader.mark_all_items_read();
+                    this._appButton.update();
+                } catch (e){
+                    global.log("error: " + e);
+                }
+
                 break;
             case "delete_all_items":
-                this.logger.debug("Marking all items 'deleted'");
+                global.log("Marking all items 'deleted'");
                 break;
         }
+    },
+    _onButtonReleaseEvent: function (actor, event) {
+        if(event.get_button() == 1){
+            this.activate(event);
+        }
+        return true;
     }
 };
