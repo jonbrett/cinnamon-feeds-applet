@@ -352,7 +352,6 @@ FeedApplet.prototype = {
         GLib.spawn_command_line_async(command);
     },
 
-
     toggle_feeds: function(feed_to_show) {
         this.logger.debug("toggle_feeds");
 
@@ -397,7 +396,6 @@ FeedApplet.prototype = {
     manage_feeds: function() {
         this.logger.debug("manage_feeds");
         try {
-
 
             let argv = [this.path + "/manage_feeds.py"];
             let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
@@ -508,7 +506,6 @@ FeedDisplayMenuItem.prototype = {
         this._title.set_text(this.rssTitle);
 
         Mainloop.idle_add(Lang.bind(this, this.update));
-        //this.menu.connect('open-state-changed', Lang.bind(this, this.on_open_state_changed));
     },
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
@@ -605,15 +602,6 @@ FeedDisplayMenuItem.prototype = {
             this.show_action_items = true;
         }
     },
-    on_open_state_changed: function(menu, open) {
-        this.logger.debug("Open State Changed: " + open);
-        this.open = open;
-        if (open)
-            this.owner.toggle_feeds(this);
-        else
-            this.owner.toggle_feeds(null);
-
-    },
 };
 
 /* Menu item for displaying an feed item */
@@ -622,7 +610,6 @@ function FeedMenuItem() {
 }
 
 FeedMenuItem.prototype = {
-    //__proto__: PopupMenu.PopupBaseMenuItem.prototype,
     __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
     _init: function (item, width, logger, params) {
