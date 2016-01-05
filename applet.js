@@ -626,12 +626,11 @@ FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
     _init: function (item, width, logger, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this);
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
         this.logger = logger;
         this.show_action_items = false;
 
         this.menu = new PopupMenu.PopupSubMenu(this.actor);
-        this.menu.actor.set_style_class_name('menu_context_menu');
 
         this.item = item;
         if (this.item.read){
@@ -650,7 +649,7 @@ FeedMenuItem.prototype = {
 
         this.label = new St.Label({text: FeedReader.html2text(item.title)});
 
-        let box = new St.BoxLayout();
+        let box = new St.BoxLayout({ style_class: 'popup-combobox-item' });
         box.set_width(MIN_MENU_WIDTH);
 
         box.add(this.icon, {span: 0});
