@@ -332,7 +332,8 @@ FeedApplet.prototype = {
     on_applet_clicked: function(event) {
         this.logger.debug("FeedApplet.on_applet_clicked");
         this.menu.toggle();
-        this.toggle_feeds(null);
+        //this.toggle_feeds(null);
+        this.show_first_feed_with_items();
     },
 
     new_item_notification: function(feedtitle, itemtitle) {
@@ -360,12 +361,28 @@ FeedApplet.prototype = {
             this.feed_to_show = feed_to_show;
 
         for (i in this.feeds) {
-            if (this.feed_to_show == this.feeds[i]) {
+            if (!first && this.feed_to_show == this.feeds[i]) {
                 this.feeds[i].menu.open(true);
             } else {
                 this.feeds[i].menu.close(true);
             }
         }
+    },
+
+    show_first_feed_with_items: function(){
+        this.logger.debug("FeedApplet.show_first_feed_with_items");
+        let found = false;
+
+        for (i in this.feeds) {
+            if (!found && this.feeds[i].unread_count > 0) {
+                this.feeds[i].menu.open(true);
+                found = true;
+            } else {
+                this.feeds[i].menu.close(true);
+            }
+        }
+
+
     },
 
     _read_manage_app_stdout: function() {
