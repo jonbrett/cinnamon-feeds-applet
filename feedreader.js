@@ -102,51 +102,64 @@ FeedReader.prototype = {
     },
 
     get: function() {
+        this.logger.debug("FeedReader.get");
         Util.spawn_async(['python', APPLET_PATH+'/getFeed.py', this.url], Lang.bind(this, this.process_feed));
     },
     
     process_feed: function(response) {
-        this.logger.debug("feedreader.process_feed");
-        this.info = JSON.parse(response);
-        this.title = this.info.title;
-        if (this.info.image) this.image = this.info.image;
-        let entries = this.info.entries;
+        this.logger.debug("FeedReader.process_feed");
         let new_items = [];
-        for (let i = 0; i < entries.length; i++) {
-            new_items.push(new FeedItem(entries[i].id, entries[i].title, entries[i].link, entries[i].description, false, this));
-        }
-        
-        /* Fetch image */
-        this._fetch_image();
+        try{
+            this.info = JSON.parse(response);
+            this.title = this.info.title;
+            if (this.info.image) this.image = this.info.image;
+            let entries = this.info.entries;
 
-        /* Is this item in the old list or a new item
-         * For existing items, transfer "read" property
-         * For new items, check against the loaded historic read list */
-        var new_count = 0;
-        var unread_items = [];
-        for (var i = 0; i < new_items.length; i++) {
-            let existing = this._get_item_by_id(new_items[i].id);
-            if (existing != null) {
-                new_items[i].read = existing.read
-            } else {
-                if (this._is_in_read_list(new_items[i].id)) {
-                    new_items[i].read = true;
-                } else {
-                    unread_items.push(new_items[i]);
-                }
-                new_count++;
+
+
+            for (let i = 0; i < entries.length; i++) {
+                new_items.push(new FeedItem(entries[i].id, entries[i].title, entries[i].link, entries[i].description, false, this));
             }
-        }
 
+            /* Fetch image */
+            this._fetch_image();
+
+            /* Is this item in the old list or a new item
+             * For existing items, transfer "read" property
+             * For new items, check against the loaded historic read list */
+            var new_count = 0;
+            var unread_items = [];
+            for (var i = 0; i < new_items.length; i++) {
+                let existing = this._get_item_by_id(new_items[i].id);
+                if (existing != null) {
+                    new_items[i].read = existing.read
+                } else {
+                    if (this._is_in_read_list(new_items[i].id)) {
+                        new_items[i].read = true;
+                    } else {
+                        unread_items.push(new_items[i]);
+                    }
+                    new_count++;
+                }
+            }
+        } catch (e) {
+            this.logger.error(e);
+            this.logger.debug(response);
+        }
         /* Were there any new items? */
         if (new_count > 0) {
             global.log("Fetched " + new_count + " new items from " + this.url);
-            this.items = new_items;
-            this.callbacks.onUpdate();
-            if(unread_items.length == 1) {
-                this.callbacks.onNewItem(this.title, unread_items[0].title);
-            } else if(unread_items.length > 1) {
-                this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
+            try{
+                this.items = new_items;
+                this.callbacks.onUpdate();
+
+                if(unread_items.length == 1) {
+                    this.callbacks.onNewItem(this.title, unread_items[0].title);
+                } else if(unread_items.length > 1) {
+                    this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
+                }
+            } catch (e){
+                this.logger.error(e);
             }
         }
     },

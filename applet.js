@@ -197,7 +197,7 @@ FeedApplet.prototype = {
         let url_list = new Array();
 
         for (var i in lines) {
-            this.logger.debug("Parsing: " + lines[i]);
+
             try{
                 /* Strip redundant (leading,trailing,multiple) whitespace */
                 lines[i] = lines[i].trim().replace(/\s+/g, " ");
@@ -206,6 +206,7 @@ FeedApplet.prototype = {
                 if (lines[i].length == 0 || lines[i].substring(0, 1) == "#")
                     continue;
 
+                this.logger.debug("Adding feed: " + lines[i]);
                 /* URL is the first word on the line, the rest of the line is an
                  * optional title */
                 url_list.push({
