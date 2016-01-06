@@ -165,14 +165,14 @@ FeedReader.prototype = {
     },
 
     mark_all_items_read: function() {
-        this.logger.debug("feedreader.mark_all_items_read");
+        this.logger.debug("FeedReader.mark_all_items_read");
         for (var i = 0; i < this.items.length; i++)
             this.items[i].mark_read();
         this.save_items();
     },
 
     save_items: function() {
-        this.logger.debug("feedreader.save_items");
+        this.logger.debug("FeedReader.save_items");
         try {
             var dir = Gio.file_parse_name(this.path);
             if (!dir.query_exists(null)) {
@@ -214,7 +214,7 @@ FeedReader.prototype = {
     },
 
     load_items: function() {
-        this.logger.debug("feedreader.load_items");
+        this.logger.debug("FeedReader.load_items");
         try {
             let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
             var content = Cinnamon.get_file_contents_utf8_sync(path);
@@ -249,7 +249,7 @@ FeedReader.prototype = {
     },
 
     _fetch_image: function() {
-        this.logger.debug("feedreader._fetch_image");
+        this.logger.debug("FeedReader._fetch_image");
         if (this.image.url == undefined || this.image.url == '')
             return;
 
@@ -267,7 +267,7 @@ FeedReader.prototype = {
     },
 
     _on_img_response: function(session, message) {
-        this.logger.debug("feedreader._on_img_response");
+        this.logger.debug("FeedReader._on_img_response");
         if (message.status_code != 200) {
             global.logError('HTTP request for ' + this.url + ' returned ' + message.status_code);
             return;
@@ -319,7 +319,7 @@ FeedReader.prototype = {
      * Log error state and report to application
      */
     on_error: function(msg, details) {
-        this.logger.error("Feedreader (" + this.url +"): " + msg);
+        this.logger.error("FeedReader (" + this.url +"): " + msg);
         this.error = true;
         this.error_messsage = msg;
         this.error_details = details;

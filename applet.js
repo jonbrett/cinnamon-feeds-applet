@@ -149,7 +149,7 @@ FeedApplet.prototype = {
     },
 
     build_context_menu: function() {
-        this.logger.debug("build_context_menu");
+        this.logger.debug("FeedApplet.build_context_menu");
         var s = new Applet.MenuItem(
                 _("Mark all read"),
                 "object-select-symbolic",
@@ -192,7 +192,7 @@ FeedApplet.prototype = {
     /* Converts a settings string into an array of objects, each containing a
      * url and title property */
     parse_feed_urls: function(str) {
-        this.logger.debug("parse_feed_urls");
+        this.logger.debug("FeedApplet.parse_feed_urls");
         let lines = str.split("\n");
         let url_list = new Array();
 
@@ -225,14 +225,14 @@ FeedApplet.prototype = {
     },
 
     url_changed: function() {
-        this.logger.debug("url_changed");
+        this.logger.debug("FeedApplet.url_changed");
         let url_list = this.parse_feed_urls(this.url_list_str);
         this.on_feeds_changed(url_list);
     },
 
     // called when feeds have been added or removed
     on_feeds_changed: function(url_list) {
-        this.logger.debug("on_feeds_changed (url_list)");
+        this.logger.debug("FeedApplet.on_feeds_changed (url_list)");
         this.feeds = new Array();
 
         this.menu.removeAll();
@@ -262,7 +262,7 @@ FeedApplet.prototype = {
      * feed info (e.g. unread count, title).  Updates the
      * applet icon and tooltip */
     update: function() {
-        this.logger.debug("update");
+        this.logger.debug("FeedApplet.update");
         let unread_count = 0;
         let tooltip = "";
 
@@ -283,7 +283,7 @@ FeedApplet.prototype = {
     },
 
     on_settings_changed: function() {
-        this.logger.debug("on_settings_changed");
+        this.logger.debug("FeedApplet.on_settings_changed");
         for (var i = 0; i < this.feeds.length; i++) {
             this.feeds[i].on_settings_changed({
                     max_items: this.max_items,
@@ -304,7 +304,7 @@ FeedApplet.prototype = {
     },
     /* renamed to refresh_tick to prevent this from being called repeatedly by somewhere */
     refresh_tick: function() {
-        this.logger.debug("Removing previous timer: " + this.timer_id);
+        this.logger.debug("FeedApplet.refresh_tick: Removing previous timer: " + this.timer_id);
 
         /* Remove any previous timeout */
         if (this.timer_id) {
@@ -330,13 +330,13 @@ FeedApplet.prototype = {
     },
 
     on_applet_clicked: function(event) {
-        this.logger.debug("on_applet_clicked");
+        this.logger.debug("FeedApplet.on_applet_clicked");
         this.menu.toggle();
         this.toggle_feeds(null);
     },
 
     new_item_notification: function(feedtitle, itemtitle) {
-        this.logger.debug("new_item_notification");
+        this.logger.debug("FeedApplet.new_item_notification");
         /* Displays a popup notification using notify-send */
 
         // if notifications are disabled don't do anything
@@ -354,7 +354,7 @@ FeedApplet.prototype = {
     },
 
     toggle_feeds: function(feed_to_show) {
-        this.logger.debug("toggle_feeds");
+        this.logger.debug("FeedApplet.toggle_feeds");
 
         if (feed_to_show != null)
             this.feed_to_show = feed_to_show;
@@ -369,7 +369,7 @@ FeedApplet.prototype = {
     },
 
     _read_manage_app_stdout: function() {
-        this.logger.debug("_read_manage_app_stdout");
+        this.logger.debug("FeedApplet._read_manage_app_stdout");
         /* Asynchronously wait for stdout of management app */
         this._manage_data_stdout.fill_async(-1, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(stream, result) {
             if (stream.fill_finish(result) == 0) {
@@ -395,7 +395,7 @@ FeedApplet.prototype = {
 
     /* Feed manager functions */
     manage_feeds: function() {
-        this.logger.debug("manage_feeds");
+        this.logger.debug("FeedApplet.manage_feeds");
         try {
 
             let argv = [this.path + "/manage_feeds.py"];
@@ -434,7 +434,7 @@ FeedApplet.prototype = {
 
     on_applet_removed_from_panel: function() {
         /* Clean up the timer so if the feed applet is removed it stops firing requests.  */
-        this.logger.debug("Removed from panel event");
+        this.logger.debug("FeedApplet.on_applet_removed_from_panel");
         if (this.timer_id) {
             this.logger.debug("Removing Timer with ID: " + this.timer_id);
             Mainloop.source_remove(this.timer_id);
@@ -511,6 +511,7 @@ FeedDisplayMenuItem.prototype = {
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
         title += " [" + this.unread_count + "]";
+        this.logger.debug(title);
         return title;
     },
     get_unread_count: function() {
@@ -529,8 +530,8 @@ FeedDisplayMenuItem.prototype = {
         this.logger.debug("Finding unread items out of: " + this.reader.items.length + "total items");
         let menu_items = 0;
         this.unread_count = 0;
-        this.logger.debug(this.max_items);
         let width = MIN_MENU_WIDTH;
+
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
             if (this.reader.items[i].read && !this.show_read_items)
                 continue;
@@ -551,9 +552,7 @@ FeedDisplayMenuItem.prototype = {
         let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
 
         /* Append unread_count to title */
-        if (this.unread_count > 0)
-            this._title.set_text(this.get_title());
-
+        this._title.set_text(this.get_title());
         this.owner.update();
     },
     refresh: function() {
