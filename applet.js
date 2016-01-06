@@ -692,8 +692,6 @@ FeedMenuItem.prototype = {
         /* Opens item then marks it read */
         this.item.open();
         this.mark_read();
-        // This will close the menu.
-        this.emit('item-read');
     },
 
     mark_read: function() {
@@ -705,6 +703,8 @@ FeedMenuItem.prototype = {
         // Close sub menus if action has been taken.
         if(this.show_action_items)
             this.toggleMenu();
+        // This will close the menu.
+        this.emit('item-read');
     },
 
     toggleMenu: function() {
