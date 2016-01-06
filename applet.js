@@ -332,8 +332,7 @@ FeedApplet.prototype = {
     on_applet_clicked: function(event) {
         this.logger.debug("FeedApplet.on_applet_clicked");
         this.menu.toggle();
-        //this.toggle_feeds(null);
-        this.show_first_feed_with_items();
+        this.toggle_feeds(null);
     },
 
     new_item_notification: function(feedtitle, itemtitle) {
@@ -357,11 +356,15 @@ FeedApplet.prototype = {
     toggle_feeds: function(feed_to_show) {
         this.logger.debug("FeedApplet.toggle_feeds");
 
-        if (feed_to_show != null)
-            this.feed_to_show = feed_to_show;
+        if (feed_to_show == null) {
+            this.show_first_feed_with_items();
+            return;
+        }
+
+        this.feed_to_show = feed_to_show;
 
         for (i in this.feeds) {
-            if (!first && this.feed_to_show == this.feeds[i]) {
+            if (this.feed_to_show == this.feeds[i]) {
                 this.feeds[i].menu.open(true);
             } else {
                 this.feeds[i].menu.close(true);
@@ -528,7 +531,6 @@ FeedDisplayMenuItem.prototype = {
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
         title += " [" + this.unread_count + "]";
-        this.logger.debug(title);
         return title;
     },
     get_unread_count: function() {
@@ -782,6 +784,7 @@ ApplicationContextMenuItem.prototype = {
                     this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
+                    this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
