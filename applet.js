@@ -120,7 +120,7 @@ FeedApplet.prototype = {
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "max_items",
                 "max_items",
-                this.update_params,
+                this.on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
@@ -546,7 +546,7 @@ FeedDisplayMenuItem.prototype = {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
 
-        this.logger.debug("Finding unread items out of: " + this.reader.items.length + "total items");
+        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + "total items");
         let menu_items = 0;
         this.unread_count = 0;
         let width = MIN_MENU_WIDTH;
@@ -560,7 +560,6 @@ FeedDisplayMenuItem.prototype = {
 
             let item = new FeedMenuItem(this.reader.items[i], width, this.logger);
             item.connect('item-read', Lang.bind(this, function () { this.update(); }));
-            this.logger.debug("Adding item: " + item);
             this.menu.addMenuItem(item);
 
             menu_items++;
@@ -577,6 +576,14 @@ FeedDisplayMenuItem.prototype = {
     refresh: function() {
         this.logger.debug("FeedDisplayMenuItem.refresh");
         this.reader.get();
+    },
+
+    on_settings_changed: function(params) {
+        this.max_items = params.max_items;
+        this.show_feed_image = params.show_feed_image;
+        this.show_read_items = params.show_read_items;
+
+        this.update();
     },
 
     _onButtonReleaseEvent: function (actor, event) {
