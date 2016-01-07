@@ -122,7 +122,7 @@ FeedReader.prototype = {
             }
 
             /* Fetch image */
-            this._fetch_image();
+            //this._fetch_image();
 
             /* Is this item in the old list or a new item
              * For existing items, transfer "read" property
