@@ -3,7 +3,6 @@ import feedparser, sys, json
 if __name__ == "__main__":
     rss = sys.argv[1]
     feed = feedparser.parse(rss)
-    
     info = {}
     
     info["title"] = feed["feed"]["title"]
@@ -13,11 +12,14 @@ if __name__ == "__main__":
     #image is optional in the rss spec
     if "image" in feed["feed"]:
         imageInfo = {}
-        imageInfo["url"] = feed["feed"]["image"]["url"]
-        imageInfo["width"] = feed["feed"]["image"]["width"]
-        imageInfo["height"] = feed["feed"]["image"]["height"]
-        info["image"] = imageInfo
-    
+        try:
+            imageInfo["url"] = feed["feed"]["image"]["url"]
+            imageInfo["width"] = feed["feed"]["image"]["width"]
+            imageInfo["height"] = feed["feed"]["image"]["height"]
+            info["image"] = imageInfo
+        except Exception, e:
+            sys.stderr.write(str(e.args))
+
     info["entries"] = []
     for item in feed["entries"]:
         itemInfo = {}
