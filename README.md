@@ -3,6 +3,13 @@ cinnamon-feeds-applet
 
 Cinnamon applet for fetching and displaying RSS feeds
 
+Prerequisites
+=============
+If not already installed by your distribution, install the python feedparser library. E.g.
+using pip:
+
+sudo pip install feedparser
+
 Installation
 ============
 The latest stable release can be installed from
