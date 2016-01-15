@@ -1,3 +1,14 @@
+0.16
+====
+- Fixed layout to work on newer cinnamon [Issue #57, #53, #46]
+- Fixed notification after removing applet [Issue #47]
+
+0.15
+====
+- Added debug logging to assist in debugging
+- Fixed issue with removing all feeds will not save changes
+- Fixed issue with importing feeds with non-ascii characters
+
 0.14
 ====
 - Remove references to Applet.MenuItem.icon [Issue #52]
