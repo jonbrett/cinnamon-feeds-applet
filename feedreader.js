@@ -32,7 +32,7 @@ const APPLET_PATH = imports.ui.appletManager.appletMeta["feeds@jonbrettdev.wordp
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
 const MAX_FEED_ITEMS = 100;
-
+const MAX_DESCRIPTION_LENGTH = 1000;
 /* FeedItem objects are used to store data for a single item in a news feed */
 function FeedItem() {
     this._init.apply(this, arguments);
@@ -40,13 +40,14 @@ function FeedItem() {
 
 FeedItem.prototype = {
 
-    _init: function(id, title, link, description, read, reader) {
+    _init: function(id, title, link, description, description_text, read, published, reader) {
         this.id = id;
         this.title = title;
         this.link = link;
         this.description = description;
+        this.description_text = description_text;
         this.read = read;
-
+        this.published = published;
         this.reader = reader;
     },
 
@@ -118,7 +119,17 @@ FeedReader.prototype = {
 
 
             for (let i = 0; i < entries.length; i++) {
-                new_items.push(new FeedItem(entries[i].id, entries[i].title, entries[i].link, entries[i].description, false, this));
+                let published = new Date(entries[i].pubDate);
+                // format title once as text
+                let title = this.html2text(entries[i].title);
+
+                // Store the description once as text and once as panjo
+                let description_text = this.html2text(entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
+                let description = this.html2pango(entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
+
+                let item = new FeedItem(entries[i].id, title, entries[i].link, description, description_text, false, published, this);
+
+                new_items.push(item);
             }
 
             /* Fetch image */
@@ -329,47 +340,61 @@ FeedReader.prototype = {
 
         return 1;
     },
+
+    html2text: function(html) {
+        /* Convert html to plaintext */
+        let ret = html.replace('<br/>', '\n');
+        ret = ret.replace('</p>','\n');
+        ret = ret.replace(/<\/h[0-9]>/g, '\n\n');
+        ret = ret.replace(/<.*?>/g, '');
+        ret = ret.replace('&nbsp;', ' ');
+        ret = ret.replace('&quot;', '"');
+        ret = ret.replace('&rdquo;', '"');
+        ret = ret.replace('&ldquo;', '"');
+        ret = ret.replace('&#8220;', '"');
+        ret = ret.replace('&#8221;', '"');
+        ret = ret.replace('&rsquo;', '\'');
+        ret = ret.replace('&lsquo;', '\'');
+        ret = ret.replace('&#8216;', '\'');
+        ret = ret.replace('&#8217;', '\'');
+        ret = ret.replace('&#8230;', '...');
+        return ret;
+    },
+
+    html2pango: function(html){
+        let ret = html;
+        let esc_open = '-@~]';
+        let esc_close= ']~@-';
+
+        /* </p> <br/> --> newline */
+        ret = ret.replace('<br/>', '\n').replace('</p>','\n');
+
+        /* &nbsp; --> space */
+        ret = ret.replace(/&nbsp;/g, ' ');
+
+        /* Headings --> <b> + 2*newline */
+        ret = ret.replace(/<h[0-9]>/g, esc_open+'span weight="bold"'+esc_close);
+        ret = ret.replace(/<\/h[0-9]>\s*/g, esc_open+'/span'+esc_close+'\n\n');
+
+        /* <strong> -> <b> */
+        ret = ret.replace('<strong>', esc_open+'b'+esc_close);
+        ret = ret.replace('</strong>', esc_open+'/b'+esc_close);
+
+        /* <i> -> <i> */
+        ret = ret.replace('<i>', esc_open+'i'+esc_close);
+        ret = ret.replace('</i>', esc_open+'/i'+esc_close);
+
+        /* Strip remaining tags */
+        ret = ret.replace(/<.*?>/g, '');
+
+        /* Replace escaped <, > with actual angle-brackets */
+        let re1 = new RegExp(esc_open, 'g');
+        let re2 = new RegExp(esc_close, 'g');
+        ret = ret.replace(re1, '<').replace(re2, '>');
+
+        return ret;
+    },
 };
-
-/* Convert html to plaintext */
-function html2text(html) {
-    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '').replace('&nbsp;', ' ').replace('&quot;', '"').replace('&rdquo;', '"').replace('&ldquo;', '"').replace('&#8220;', '"').replace('&#8221;', '"').replace('&rsquo;', '\'').replace('&lsquo;', '\'').replace('&#8216;', '\'').replace('&#8217;', '\'').replace('&#8230;', '...');
-}
-
-/* Convert html to (basic) Gnome Pango markup */
-function html2pango(html) {
-    let ret = html;
-    let esc_open = '-@~]';
-    let esc_close= ']~@-';
-
-    /* </p> <br/> --> newline */
-    ret = ret.replace('<br/>', '\n').replace('</p>','\n');
-
-    /* &nbsp; --> space */
-    ret = ret.replace(/&nbsp;/g, ' ');
-
-    /* Headings --> <b> + 2*newline */
-    ret = ret.replace(/<h[0-9]>/g, esc_open+'span weight="bold"'+esc_close);
-    ret = ret.replace(/<\/h[0-9]>\s*/g, esc_open+'/span'+esc_close+'\n\n');
-
-    /* <strong> -> <b> */
-    ret = ret.replace('<strong>', esc_open+'b'+esc_close);
-    ret = ret.replace('</strong>', esc_open+'/b'+esc_close);
-
-    /* <i> -> <i> */
-    ret = ret.replace('<i>', esc_open+'i'+esc_close);
-    ret = ret.replace('</i>', esc_open+'/i'+esc_close);
-
-    /* Strip remaining tags */
-    ret = ret.replace(/<.*?>/g, '');
-
-    /* Replace escaped <, > with actual angle-brackets */
-    let re1 = new RegExp(esc_open, 'g');
-    let re2 = new RegExp(esc_close, 'g');
-    ret = ret.replace(re1, '<').replace(re2, '>');
-
-    return ret;
-}
 
 function sanitize_url(url) {
     return url.replace(/.*:\/\//, '').replace(/\//g,'--');

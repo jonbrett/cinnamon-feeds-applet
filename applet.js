@@ -658,7 +658,7 @@ FeedMenuItem.prototype = {
                 icon_type: this.icon_type,
                 style_class: 'popup-menu-icon' });
 
-        this.label = new St.Label({text: FeedReader.html2text(item.title)});
+        this.label = new St.Label({text: item.title});
 
         let box = new St.BoxLayout({ style_class: 'popup-combobox-item' });
         box.set_width(MIN_MENU_WIDTH);
@@ -667,9 +667,11 @@ FeedMenuItem.prototype = {
         box.add(this.label, {expand: true, span: 1, align: St.Align.START});
         this.addActor(box);
 
-        this.tooltip = new Tooltips.Tooltip(this.actor,
-                FeedReader.html2text(item.title) + '\n\n' +
-                FeedReader.html2text(item.description));
+        let description = item.title  +  '\n' +
+                'Published: ' + item.published  +  '\n\n' +
+                item.description_text;
+
+        this.tooltip = new Tooltips.Tooltip(this.actor, description);
 
         /* Some hacking of the underlying tooltip ClutterText to set wrapping,
          * format, etc */
@@ -680,9 +682,10 @@ FeedMenuItem.prototype = {
             this.tooltip._tooltip.get_clutter_text().set_line_wrap(true);
             this.tooltip._tooltip.get_clutter_text().set_markup(
                     '<span weight="bold">' +
-                    FeedReader.html2pango(item.title) +
-                    '</span>\n\n' +
-                    FeedReader.html2pango(item.description));
+                    item.title +
+                    '</span>\n' +
+                    'Published: ' + item.published  +  '\n\n' +
+                    item.description);
         } catch (e) {
             this.logger.debug("Error Tweaking Tooltip: " + e);
             /* If we couldn't tweak the tooltip format this is likely because
