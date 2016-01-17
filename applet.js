@@ -384,8 +384,6 @@ FeedApplet.prototype = {
                 this.feeds[i].menu.close(true);
             }
         }
-
-
     },
 
     _read_manage_app_stdout: function() {
@@ -511,7 +509,7 @@ FeedDisplayMenuItem.prototype = {
         this.reader = new FeedReader.FeedReader(
                 this.logger,
                 url,
-                '~/.cinnamon/' + UUID + '/' + owner.instance_id,
+                '~/.cinnamon/' + UUID,
                 {
                     'onUpdate' : Lang.bind(this, this.update),
                     'onError' : Lang.bind(this, this.error),
