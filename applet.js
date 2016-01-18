@@ -556,7 +556,7 @@ FeedDisplayMenuItem.prototype = {
             if (!this.reader.items[i].read)
                 this.unread_count++;
 
-            let item = new FeedMenuItem(this.reader.items[i], width, this.logger);
+            let item = new FeedMenuItem(this, this.reader.items[i], width, this.logger);
             item.connect('item-read', Lang.bind(this, function () { this.update(); }));
             this.menu.addMenuItem(item);
 
@@ -636,8 +636,9 @@ function FeedMenuItem() {
 FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
-    _init: function (item, width, logger, params) {
+    _init: function (parent, item, width, logger, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+        this.parent = parent;
         this.logger = logger;
         this.show_action_items = false;
 
@@ -729,8 +730,12 @@ FeedMenuItem.prototype = {
         // Close sub menus if action has been taken.
         if(this.show_action_items)
             this.toggleMenu();
-        // This will close the menu.
+
         this.emit('item-read');
+
+        // Check and toggle feeds if this is the last item.
+        if(this.parent.get_unread_count() == 0)
+            this.parent.owner.toggle_feeds();
     },
 
     toggleMenu: function() {
