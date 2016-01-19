@@ -109,48 +109,47 @@ FeedReader.prototype = {
     
     process_feed: function(response) {
         this.logger.debug("FeedReader.process_feed");
+
+        let start = new Date().getTime(); // Temp timer for gathering info of performance changes
         let new_items = [];
+        let new_count = 0;
+        let unread_items = [];
+
         try{
-            this.info = JSON.parse(response);
-            this.title = this.info.title;
-            if (this.info.image) this.image = this.info.image;
-            let entries = this.info.entries;
+            let info = JSON.parse(response);
+            this.title = info.title;
+            this.logger.debug("Processing feed: " + info.title);
+            // Look for new items
+            for (let i = 0; i < info.entries.length; i++) {
+                // We only need to process new items, so check if the item exists already
+                let existing = this._get_item_by_id(info.entries[i].id);
 
+                if(existing == null){
+                    this.logger.debug("New Item: foo " + info.entries[i].id);
 
+                    // not found, add to new item list.
+                    let published = new Date(info.entries[i].pubDate);
+                    // format title once as text
+                    let title = this.html2text(info.entries[i].title);
 
-            for (let i = 0; i < entries.length; i++) {
-                let published = new Date(entries[i].pubDate);
-                // format title once as text
-                let title = this.html2text(entries[i].title);
+                    // Store the description once as text and once as panjo
+                    let description_text = this.html2text(info.entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
+                    let description = this.html2pango(info.entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
 
-                // Store the description once as text and once as panjo
-                let description_text = this.html2text(entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
-                let description = this.html2pango(entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
-
-                let item = new FeedItem(entries[i].id, title, entries[i].link, description, description_text, false, published, this);
-
-                new_items.push(item);
-            }
-
-            /* Fetch image */
-            //this._fetch_image();
-
-            /* Is this item in the old list or a new item
-             * For existing items, transfer "read" property
-             * For new items, check against the loaded historic read list */
-            var new_count = 0;
-            var unread_items = [];
-            for (var i = 0; i < new_items.length; i++) {
-                let existing = this._get_item_by_id(new_items[i].id);
-                if (existing != null) {
-                    new_items[i].read = existing.read
-                } else {
-                    if (this._is_in_read_list(new_items[i].id)) {
-                        new_items[i].read = true;
+                    let item = new FeedItem(info.entries[i].id, title, info.entries[i].link, description, description_text, false, published, this);
+                    // check if already read ??
+                    if(this._is_in_read_list(item.id)){
+                        item.read = true;
+                        this.logger.debug("Item Read");
                     } else {
-                        unread_items.push(new_items[i]);
+                        unread_items.push(item);
                     }
-                    new_count++;
+
+                    new_items.push(item);
+                } else {
+                    // Existing item, reuse the item for now.
+                    this.logger.debug("Existing Item: " + existing.id);
+                    new_items.push(existing);
                 }
             }
         } catch (e) {
@@ -158,8 +157,8 @@ FeedReader.prototype = {
             this.logger.debug(response);
         }
         /* Were there any new items? */
-        if (new_count > 0) {
-            global.log("Fetched " + new_count + " new items from " + this.url);
+        if (unread_items.length > 0) {
+            global.log("Fetched " + unread_items.length + " new items from " + this.url);
             try{
                 this.items = new_items;
                 this.callbacks.onUpdate();
@@ -173,6 +172,10 @@ FeedReader.prototype = {
                 this.logger.error(e);
             }
         }
+        let time =  new Date().getTime() - start;
+
+        this.logger.debug("Processing Items took: " + time + " ms");
+
     },
 
     mark_all_items_read: function() {
@@ -256,56 +259,6 @@ FeedReader.prototype = {
         } catch (e) {
             /* Invalid file contents */
             global.logError('Failed to read feed data file for ' + this.url + ':' + e);
-        }
-    },
-
-    _fetch_image: function() {
-        this.logger.debug("FeedReader._fetch_image");
-        if (this.image.url == undefined || this.image.url == '')
-            return;
-
-        /* Use local file if it already exists */
-        let f = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
-        if (f.query_exists(null)) {
-            this.image.path = f.get_path();
-            return;
-        }
-
-        /* Request image url */
-        let msg = Soup.Message.new('GET', this.image.url);
-        this.session.queue_message(msg,
-                Lang.bind(this, this._on_img_response));
-    },
-
-    _on_img_response: function(session, message) {
-        this.logger.debug("FeedReader._on_img_response");
-        if (message.status_code != 200) {
-            global.logError('HTTP request for ' + this.url + ' returned ' + message.status_code);
-            return;
-        }
-
-        try {
-            var dir = Gio.file_parse_name(this.path);
-            if (!dir.query_exists(null)) {
-                dir.make_directory_with_parents(null);
-            }
-
-            let file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
-            let fs = file.replace(null, false,
-                    Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-
-            var to_write = message.response_body.length;
-            while (to_write > 0) {
-                to_write -= fs.write(message.response_body.get_chunk(message.response_body.length - to_write).get_data(),
-                        null, to_write);
-            }
-            fs.close(null);
-
-            this.image.path = file.get_path();
-            this.callbacks.onUpdate();
-        } catch (e) {
-            global.log("Error saving feed image for " + this.url + ": " + e);
-            this.image.path = undefined;
         }
     },
 
