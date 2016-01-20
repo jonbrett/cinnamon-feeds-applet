@@ -659,7 +659,10 @@ FeedMenuItem.prototype = {
                 icon_type: this.icon_type,
                 style_class: 'popup-menu-icon' });
 
-        this.label = new St.Label({text: item.title});
+        // Calculate the age of the post, hours or days only
+        let age = this.calculate_age(item.published);
+
+        this.label = new St.Label({text: age + item.title});
 
         let box = new St.BoxLayout({ style_class: 'popup-combobox-item' });
         box.set_width(MIN_MENU_WIDTH);
@@ -769,6 +772,25 @@ FeedMenuItem.prototype = {
             }
         }
         this.menu.toggle();
+    },
+
+    calculate_age: function(published){
+        try {
+            let age = new Date().getTime() - published;
+            let h = Math.floor(age / (60 * 60 * 1000));
+            let d = Math.floor(age / (24 * 60 * 60 * 1000))
+
+            if(d > 0){
+                return "(" + d + "d) ";
+            } else if (h > 0) {
+                return "(" + h + "h) "
+            } else {
+                return "( < 1h) ";
+            }
+        } catch (e){
+            this.logger.error(e);
+            return '';
+        }
     },
 };
 
