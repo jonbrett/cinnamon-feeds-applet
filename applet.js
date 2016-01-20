@@ -785,7 +785,7 @@ FeedMenuItem.prototype = {
             } else if (h > 0) {
                 return "(" + h + "h) "
             } else {
-                return "( < 1h) ";
+                return "(<1h) ";
             }
         } catch (e){
             this.logger.error(e);
