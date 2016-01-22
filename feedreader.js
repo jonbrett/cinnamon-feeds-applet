@@ -60,11 +60,13 @@ FeedItem.prototype = {
         }
         this.mark_read();
         //this.reader.logger.debug("FeedItem.open calling save_items");
-        this.reader.save_items();
+
     },
 
     mark_read: function() {
+        // Mark the item read and save the state.
         this.read = true;
+        this.reader.save_items();
     }
 }
 
