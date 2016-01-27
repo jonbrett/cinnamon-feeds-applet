@@ -100,6 +100,14 @@ FeedApplet.prototype = {
 
         this.build_context_menu();
         this.update();
+
+        this.timeout = this.refresh_interval_mins * 60 * 1000;
+        this.logger.debug("Initial timeout set in: " + this.timeout + " ms");
+        /* Set the next timeout */
+        this.timer_id = Mainloop.timeout_add(this.timeout,
+                Lang.bind(this, this.refresh_tick));
+
+        this.logger.debug("timer_id: " + this.timer_id);
     },
 
     init_settings: function(instance_id) {
@@ -238,7 +246,6 @@ FeedApplet.prototype = {
         this.menu.removeAll();
 
         // Feed Level Menu Items Added Here (each Feed includes posts).
-
         for(var i = 0; i < url_list.length; i++) {
             this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
@@ -250,12 +257,6 @@ FeedApplet.prototype = {
                     });
             this.menu.addMenuItem(this.feeds[i]);
         }
-
-        if (this.feeds.length > 0)
-            this.feed_to_show = this.feeds[0];
-
-        this.logger.debug("on_feeds_changed calling refresh");
-        this.refresh_tick();
     },
 
     /* Called by Feed Display items to notify of changes to
@@ -267,10 +268,10 @@ FeedApplet.prototype = {
         let tooltip = "";
 
         for (var i = 0; i < this.feeds.length; i++) {
+            // TODO: We can just check if there are unread feeds here and drop the incrementing count
             unread_count += this.feeds[i].get_unread_count();
             if (i != 0)
                 tooltip += "\n";
-            //tooltip += this.feeds[i].get_title() + "[" + this.feeds[i].get_unread_count() + "]";
             tooltip += this.feeds[i].get_title();
         }
 
@@ -312,9 +313,9 @@ FeedApplet.prototype = {
             this.timer_id = 0;
         }
         this.logger.debug("Updating all feed display items");
+
         /* Update all feed display items */
         for (var i = 0; i < this.feeds.length; i++) {
-
             this.feeds[i].refresh();
         }
 
@@ -513,9 +514,12 @@ FeedDisplayMenuItem.prototype = {
                 {
                     'onUpdate' : Lang.bind(this, this.update),
                     'onError' : Lang.bind(this, this.error),
-                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification)
+                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification),
                 }
             );
+
+        // Force a load of items here
+        this.refresh();
 
         if(!params.custom_title)
             this.rssTitle = this.reader.title;
@@ -526,25 +530,30 @@ FeedDisplayMenuItem.prototype = {
 
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
+
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
-        title += " [" + this.unread_count + "]";
+        this.logger.debug("reader unread: " + this.reader.get_unread_count() + " Local unread: " + this.unread_count);
+        title += " [" + this.reader.get_unread_count() + " / " + this.reader.items.length + "]";
         return title;
     },
+
     get_unread_count: function() {
         return this.unread_count;
     },
+
     error: function(reader, message, full_message) {
         this.menu.removeAll();
 
         this.menu.addMenuItem(new LabelMenuItem(
                     message, full_message));
     },
+
     update: function() {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
-
-        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + "total items");
+        this.logger.debug(this.reader.items.length);
+        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
         let menu_items = 0;
         this.unread_count = 0;
         let width = MIN_MENU_WIDTH;

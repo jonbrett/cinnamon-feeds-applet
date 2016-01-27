@@ -26,6 +26,7 @@ const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
+const Signals = imports.signals;
 
 const APPLET_PATH = imports.ui.appletManager.appletMeta["feeds@jonbrettdev.wordpress.com"].path;
 
@@ -40,15 +41,14 @@ function FeedItem() {
 
 FeedItem.prototype = {
 
-    _init: function(id, title, link, description, description_text, read, published, reader) {
+    _init: function(id, title, link, description, description_text, published) {
         this.id = id;
         this.title = title;
         this.link = link;
         this.description = description;
         this.description_text = description_text;
-        this.read = read;
         this.published = published;
-        this.reader = reader;
+        this.read = false;
         this.deleted = false;
     },
 
@@ -58,21 +58,23 @@ FeedItem.prototype = {
         } catch (e) {
             global.logError(e);
         }
-        this.mark_read();
+        mark_read();
     },
 
-    mark_read: function() {
-        // Mark the item read and save the state.
+    mark_read: function(all) {
         this.read = true;
-        this.reader.save_items();
-        this.reader.save_items_v2();
+        // Only notify when marking individual items
+        if(all == undefined)
+            this.emit('item-read');
     },
 
     delete_item: function() {
         this.deleted = true;
-        this.reader.save_items_v2();
+        //this.reader.save_items_v2();
+        this.callbacks.onItemDeleted();
     },
 }
+Signals.addSignalMethods(FeedItem.prototype);
 
 function FeedReader() {
     this._init.apply(this, arguments);
@@ -81,7 +83,7 @@ function FeedReader() {
 FeedReader.prototype = {
 
     _init: function(logger, url, path, callbacks) {
-
+        this.item_status = new Array();
         this.url = url;
         this.path = path;
         this.callbacks = callbacks;
@@ -92,8 +94,8 @@ FeedReader.prototype = {
         this.title = "";
         this.items = new Array();
         this.read_list = new Array();
-        this.image = {}
 
+        this.image = {}
 
         /* Init HTTP session */
         try {
@@ -132,8 +134,6 @@ FeedReader.prototype = {
                 let existing = this._get_item_by_id(info.entries[i].id);
 
                 if(existing == null){
-                    this.logger.debug("New Item: foo " + info.entries[i].id);
-
                     // not found, add to new item list.
                     let published = new Date(info.entries[i].pubDate);
                     // format title once as text
@@ -143,11 +143,22 @@ FeedReader.prototype = {
                     let description_text = this.html2text(info.entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
                     let description = this.html2pango(info.entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
 
-                    let item = new FeedItem(info.entries[i].id, title, info.entries[i].link, description, description_text, false, published, this);
+                    let item = new FeedItem(info.entries[i].id,
+                                            title,
+                                            info.entries[i].link,
+                                            description,
+                                            description_text,
+                                            published
+                                   );
+
+                    // Connect the events
+                    item.connect('item-read', Lang.bind(this, function() { this.on_item_read(); }));
+                    item.connect('item-deleted', Lang.bind(this, function() { this.on_item_deleted(); }));
+
+                    // TODO: v1 only
                     // check if already read ??
                     if(this._is_in_read_list(item.id)){
                         item.read = true;
-                        this.logger.debug("Item Read");
                     } else {
                         unread_items.push(item);
                     }
@@ -155,7 +166,6 @@ FeedReader.prototype = {
                     new_items.push(item);
                 } else {
                     // Existing item, reuse the item for now.
-                    this.logger.debug("Existing Item: " + existing.id);
                     new_items.push(existing);
                 }
             }
@@ -175,10 +185,19 @@ FeedReader.prototype = {
                 } else if(unread_items.length > 1) {
                     this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
                 }
+                // Update the saved items so we can keep track of new and unread items.
+                this.save_items_v2();
             } catch (e){
                 this.logger.error(e);
             }
         }
+
+        // Make items available even on the first load.
+        if (this.items.length == 0 && new_items.length > 0){
+            this.items = new_items;
+            this.callbacks.onUpdate();
+        }
+
         let time =  new Date().getTime() - start;
 
         this.logger.debug("Processing Items took: " + time + " ms");
@@ -187,9 +206,24 @@ FeedReader.prototype = {
 
     mark_all_items_read: function() {
         this.logger.debug("FeedReader.mark_all_items_read");
+
+        // v1
         for (var i = 0; i < this.items.length; i++)
-            this.items[i].mark_read();
+            this.items[i].mark_read(true);
+
+        // v2
         this.save_items();
+        this.save_items_v2();
+    },
+
+    on_item_read: function() {
+        this.logger.debug("FeedReader.on_item_read");
+        this.save_items();
+        this.save_items_v2();
+    },
+
+    on_item_deleted: function() {
+        this.logger.debug("FeedReader.on_item_deleted");
         this.save_items_v2();
     },
 
@@ -264,6 +298,9 @@ FeedReader.prototype = {
                     "deleted": this.items[i].deleted,
                 });
             }
+
+            // Update the item status
+            this.item_status = item_list;
 
             let output = JSON.stringify({
                 "feed_title": this.title,
@@ -354,6 +391,16 @@ FeedReader.prototype = {
         }
     },
 
+    get_unread_count: function() {
+        let count = 0;
+        for (var i = 0; i < this.item_status.length; i++) {
+            if (!this.item_status[i].read){
+                count++;
+            }
+        }
+        return count;
+    },
+
     _get_item_by_id: function(id) {
         for (var i = 0; i < this.items.length; i++) {
             if (this.items[i].id == id)
@@ -371,7 +418,7 @@ FeedReader.prototype = {
     },
 
     _is_item_read: function(id){
-        for (var i = 0; i < this.read_list.length; i++) {
+        for (var i = 0; i < this.item_status.length; i++) {
             if (this.item_status[i].id == id && this.item_status[i].read)
                 return true;
         }
