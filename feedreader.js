@@ -58,20 +58,19 @@ FeedItem.prototype = {
         } catch (e) {
             global.logError(e);
         }
-        mark_read();
+        this.mark_read();
     },
 
-    mark_read: function(all) {
+    mark_read: function(single = true) {
         this.read = true;
         // Only notify when marking individual items
-        if(all == undefined)
+        if(single)
             this.emit('item-read');
     },
 
     delete_item: function() {
         this.deleted = true;
-        //this.reader.save_items_v2();
-        this.callbacks.onItemDeleted();
+        this.emit('item-deleted');
     },
 }
 Signals.addSignalMethods(FeedItem.prototype);
@@ -207,9 +206,8 @@ FeedReader.prototype = {
     mark_all_items_read: function() {
         this.logger.debug("FeedReader.mark_all_items_read");
 
-        // v1
         for (var i = 0; i < this.items.length; i++)
-            this.items[i].mark_read(true);
+            this.items[i].mark_read(false);
 
         // v2
         this.save_items();
