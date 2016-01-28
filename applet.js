@@ -533,7 +533,6 @@ FeedDisplayMenuItem.prototype = {
 
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
-        this.logger.debug("reader unread: " + this.reader.get_unread_count() + " Local unread: " + this.unread_count);
         title += " [" + this.reader.get_unread_count() + " / " + this.reader.items.length + "]";
         return title;
     },
@@ -552,7 +551,6 @@ FeedDisplayMenuItem.prototype = {
     update: function() {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
-        this.logger.debug(this.reader.items.length);
         this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
         let menu_items = 0;
         this.unread_count = 0;

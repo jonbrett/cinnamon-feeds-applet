@@ -92,7 +92,7 @@ FeedReader.prototype = {
         /* Feed data */
         this.title = "";
         this.items = new Array();
-        this.read_list = new Array();
+        //this.read_list = new Array();
 
         this.image = {}
 
@@ -107,7 +107,6 @@ FeedReader.prototype = {
 
         /* Load items */
         this.load_items();
-        this.load_items_v2();
     },
 
     get: function() {
@@ -154,9 +153,8 @@ FeedReader.prototype = {
                     item.connect('item-read', Lang.bind(this, function() { this.on_item_read(); }));
                     item.connect('item-deleted', Lang.bind(this, function() { this.on_item_deleted(); }));
 
-                    // TODO: v1 only
-                    // check if already read ??
-                    if(this._is_in_read_list(item.id)){
+                    // check if already read
+                    if(this._is_item_read(item.id)){
                         item.read = true;
                     } else {
                         unread_items.push(item);
@@ -185,7 +183,7 @@ FeedReader.prototype = {
                     this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
                 }
                 // Update the saved items so we can keep track of new and unread items.
-                this.save_items_v2();
+                this.save_items();
             } catch (e){
                 this.logger.error(e);
             }
@@ -209,23 +207,20 @@ FeedReader.prototype = {
         for (var i = 0; i < this.items.length; i++)
             this.items[i].mark_read(false);
 
-        // v2
         this.save_items();
-        this.save_items_v2();
     },
 
     on_item_read: function() {
         this.logger.debug("FeedReader.on_item_read");
         this.save_items();
-        this.save_items_v2();
     },
 
     on_item_deleted: function() {
         this.logger.debug("FeedReader.on_item_deleted");
-        this.save_items_v2();
+        this.save_items();
     },
 
-    save_items: function() {
+    save_items: function(){
         this.logger.debug("FeedReader.save_items");
         try {
             var dir = Gio.file_parse_name(this.path);
@@ -245,49 +240,6 @@ FeedReader.prototype = {
             var fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 
-            let read_list = [];
-            for (var i = 0; i < this.items.length; i++) {
-                if (this.items[i].read == true)
-                    read_list.push({ "id" : this.items[i].id });
-            }
-
-            var data = {
-                "title": this.title,
-                "read_list": read_list,
-            };
-
-            let output = escape(JSON.stringify(data));
-            let to_write = output.length;
-            while (to_write > 0) {
-                to_write -= fs.write(output , null);
-            }
-            fs.close(null);
-        } catch (e) {
-            global.logError('Failed to write feed file ' + e);
-        }
-    },
-
-    // Version 2 will save all items to a json list.
-    save_items_v2: function(){
-        this.logger.debug("FeedReader.save_items_v2");
-        try {
-            var dir = Gio.file_parse_name(this.path);
-            if (!dir.query_exists(null)) {
-                dir.make_directory_with_parents(null);
-            }
-
-            /* Write feed items read list to a file as JSON.
-             * I found escaping the string helps to deal with special
-             * characters, which could cause problems when parsing the file
-             * later */
-            var filename = this.path + '/' + sanitize_url(this.url) + "_v2";
-            this.logger.debug("saving feed data to: " + filename);
-
-            var file = Gio.file_parse_name(filename);
-
-            var fs = file.replace(null, false,
-                    Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-
             let item_list = [];
             for (var i = 0; i < this.items.length; i++) {
                 item_list.push({
@@ -300,10 +252,10 @@ FeedReader.prototype = {
             // Update the item status
             this.item_status = item_list;
 
-            let output = JSON.stringify({
+            let output = escape(JSON.stringify({
                 "feed_title": this.title,
                 "item_list": item_list,
-            });
+            }));
 
             let to_write = output.length;
             while (to_write > 0) {
@@ -316,12 +268,12 @@ FeedReader.prototype = {
     },
 
     // Version 2 will load all items which have been saved to file.
-    load_items_v2: function() {
-        this.logger.debug("FeedReader.load_items_v2");
+    load_items: function() {
+        this.logger.debug("FeedReader.load_items");
         try {
             let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
             //var content = Cinnamon.get_file_contents_utf8_sync(path);
-            var content = Cinnamon.get_file_contents_utf8_sync(path + "_v2");
+            var content = Cinnamon.get_file_contents_utf8_sync(path);
         } catch (e) {
             /* This is fine for new feeds */
             this.logger.debug("No file found - Assuming new feed.")
@@ -330,7 +282,7 @@ FeedReader.prototype = {
 
         try {
             this.logger.debug("Loading already fetched feed items");
-            var data = JSON.parse(content);
+            var data = JSON.parse(escape(content));
 
             if (typeof data == "object") {
                 /* Load feedreader data */
@@ -345,41 +297,6 @@ FeedReader.prototype = {
                     this.item_status = new Array();
 
                 this.logger.debug("Number Loaded: " + this.item_status.length);
-            } else {
-                global.logError('Invalid data file for ' + this.url);
-            }
-        } catch (e) {
-            /* Invalid file contents */
-            global.logError('Failed to read feed data file for ' + this.url + ':' + e);
-        }
-    },
-
-    load_items: function() {
-        this.logger.debug("FeedReader.load_items");
-        try {
-            let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
-            var content = Cinnamon.get_file_contents_utf8_sync(path);
-        } catch (e) {
-            /* This is fine for new feeds */
-            this.logger.debug("No file found - Assuming new feed.")
-            return;
-        }
-
-        try {
-            this.logger.debug("Loading already fetched feed items");
-            var data = JSON.parse(unescape(content));
-
-            if (typeof data == "object") {
-                /* Load feedreader data */
-                if (data.title != undefined)
-                    this.title = data.title;
-                else
-                    this.title = _("Loading feed");
-
-                if (data.read_list != undefined)
-                    this.read_list = data.read_list;
-                else
-                    this.read_list = new Array();
             } else {
                 global.logError('Invalid data file for ' + this.url);
             }
@@ -405,14 +322,6 @@ FeedReader.prototype = {
                 return this.items[i];
         }
         return null;
-    },
-
-    _is_in_read_list: function(id) {
-        for (var i = 0; i < this.read_list.length; i++) {
-            if (this.read_list[i].id == id)
-                return true;
-        }
-        return false;
     },
 
     _is_item_read: function(id){
