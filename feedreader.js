@@ -153,11 +153,15 @@ FeedReader.prototype = {
                     item.connect('item-read', Lang.bind(this, function() { this.on_item_read(); }));
                     item.connect('item-deleted', Lang.bind(this, function() { this.on_item_deleted(); }));
 
+
+
                     // check if already read
                     if(this._is_item_read(item.id)){
                         item.read = true;
+                        this.logger.debug("Item Read!");
                     } else {
                         unread_items.push(item);
+                        this.logger.debug("Item NOT Read!");
                     }
 
                     new_items.push(item);
@@ -252,10 +256,12 @@ FeedReader.prototype = {
             // Update the item status
             this.item_status = item_list;
 
-            let output = escape(JSON.stringify({
+            let data = {
                 "feed_title": this.title,
                 "item_list": item_list,
-            }));
+            };
+
+            let output = escape(JSON.stringify(data));
 
             let to_write = output.length;
             while (to_write > 0) {
@@ -282,7 +288,7 @@ FeedReader.prototype = {
 
         try {
             this.logger.debug("Loading already fetched feed items");
-            var data = JSON.parse(escape(content));
+            var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {
                 /* Load feedreader data */
@@ -325,6 +331,8 @@ FeedReader.prototype = {
     },
 
     _is_item_read: function(id){
+        this.logger.debug("Total Read Items: " + this.item_status.length);
+        this.logger.debug("Searching for: " + id);
         for (var i = 0; i < this.item_status.length; i++) {
             if (this.item_status[i].id == id && this.item_status[i].read)
                 return true;

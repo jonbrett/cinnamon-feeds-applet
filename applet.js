@@ -650,7 +650,7 @@ FeedMenuItem.prototype = {
         this.show_action_items = false;
 
         this.menu = new PopupMenu.PopupSubMenu(this.actor);
-
+        this.logger.debug("Is item read? : " + item.read);
         this.item = item;
         if (this.item.read){
                 this._icon_name = 'feed-symbolic';
