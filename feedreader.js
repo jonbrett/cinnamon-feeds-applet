@@ -179,6 +179,8 @@ FeedReader.prototype = {
             global.log("Fetched " + unread_items.length + " new items from " + this.url);
             try{
                 this.items = new_items;
+                // Update the saved items so we can keep track of new and unread items.
+                this.save_items();
                 this.callbacks.onUpdate();
 
                 if(unread_items.length == 1) {
@@ -186,8 +188,7 @@ FeedReader.prototype = {
                 } else if(unread_items.length > 1) {
                     this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
                 }
-                // Update the saved items so we can keep track of new and unread items.
-                this.save_items();
+
             } catch (e){
                 this.logger.error(e);
             }
