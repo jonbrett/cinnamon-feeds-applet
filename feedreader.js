@@ -26,13 +26,14 @@ const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
+const Signals = imports.signals;
 
 const APPLET_PATH = imports.ui.appletManager.appletMeta["feeds@jonbrettdev.wordpress.com"].path;
 
 /* Maximum number of "cached" feed items to keep for this feed.
  * Older items will be trimmed first */
 const MAX_FEED_ITEMS = 100;
-
+const MAX_DESCRIPTION_LENGTH = 1000;
 /* FeedItem objects are used to store data for a single item in a news feed */
 function FeedItem() {
     this._init.apply(this, arguments);
@@ -40,32 +41,39 @@ function FeedItem() {
 
 FeedItem.prototype = {
 
-    _init: function(id, title, link, description, read, reader) {
+    _init: function(id, title, link, description, description_text, published) {
         this.id = id;
         this.title = title;
         this.link = link;
         this.description = description;
-        this.read = read;
-
-        this.reader = reader;
+        this.description_text = description_text;
+        this.published = published;
+        this.read = false;
+        this.deleted = false;
     },
 
     open: function() {
-        //this.reader.logger.debug("FeedItem.open");
         try {
             Util.spawnCommandLine('xdg-open ' + this.link);
         } catch (e) {
             global.logError(e);
         }
         this.mark_read();
-        //this.reader.logger.debug("FeedItem.open calling save_items");
-        this.reader.save_items();
     },
 
-    mark_read: function() {
+    mark_read: function(single = true) {
         this.read = true;
-    }
+        // Only notify when marking individual items
+        if(single)
+            this.emit('item-read');
+    },
+
+    delete_item: function() {
+        this.deleted = true;
+        this.emit('item-deleted');
+    },
 }
+Signals.addSignalMethods(FeedItem.prototype);
 
 function FeedReader() {
     this._init.apply(this, arguments);
@@ -74,7 +82,7 @@ function FeedReader() {
 FeedReader.prototype = {
 
     _init: function(logger, url, path, callbacks) {
-
+        this.item_status = new Array();
         this.url = url;
         this.path = path;
         this.callbacks = callbacks;
@@ -84,9 +92,9 @@ FeedReader.prototype = {
         /* Feed data */
         this.title = "";
         this.items = new Array();
-        this.read_list = new Array();
-        this.image = {}
+        //this.read_list = new Array();
 
+        this.image = {}
 
         /* Init HTTP session */
         try {
@@ -108,38 +116,58 @@ FeedReader.prototype = {
     
     process_feed: function(response) {
         this.logger.debug("FeedReader.process_feed");
+
+        let start = new Date().getTime(); // Temp timer for gathering info of performance changes
         let new_items = [];
+        let new_count = 0;
+        let unread_items = [];
+
         try{
-            this.info = JSON.parse(response);
-            this.title = this.info.title;
-            if (this.info.image) this.image = this.info.image;
-            let entries = this.info.entries;
+            let info = JSON.parse(response);
+            this.title = info.title;
+            this.logger.debug("Processing feed: " + info.title);
+            // Look for new items
+            for (let i = 0; i < info.entries.length; i++) {
+                // We only need to process new items, so check if the item exists already
+                let existing = this._get_item_by_id(info.entries[i].id);
+
+                if(existing == null){
+                    // not found, add to new item list.
+                    let published = new Date(info.entries[i].pubDate);
+                    // format title once as text
+                    let title = this.html2text(info.entries[i].title);
+
+                    // Store the description once as text and once as panjo
+                    let description_text = this.html2text(info.entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
+                    let description = this.html2pango(info.entries[i].description).substring(0,MAX_DESCRIPTION_LENGTH);
+
+                    let item = new FeedItem(info.entries[i].id,
+                                            title,
+                                            info.entries[i].link,
+                                            description,
+                                            description_text,
+                                            published
+                                   );
+
+                    // Connect the events
+                    item.connect('item-read', Lang.bind(this, function() { this.on_item_read(); }));
+                    item.connect('item-deleted', Lang.bind(this, function() { this.on_item_deleted(); }));
 
 
 
-            for (let i = 0; i < entries.length; i++) {
-                new_items.push(new FeedItem(entries[i].id, entries[i].title, entries[i].link, entries[i].description, false, this));
-            }
-
-            /* Fetch image */
-            //this._fetch_image();
-
-            /* Is this item in the old list or a new item
-             * For existing items, transfer "read" property
-             * For new items, check against the loaded historic read list */
-            var new_count = 0;
-            var unread_items = [];
-            for (var i = 0; i < new_items.length; i++) {
-                let existing = this._get_item_by_id(new_items[i].id);
-                if (existing != null) {
-                    new_items[i].read = existing.read
-                } else {
-                    if (this._is_in_read_list(new_items[i].id)) {
-                        new_items[i].read = true;
+                    // check if already read
+                    if(this._is_item_read(item.id)){
+                        item.read = true;
+                        this.logger.debug("Item Read!");
                     } else {
-                        unread_items.push(new_items[i]);
+                        unread_items.push(item);
+                        this.logger.debug("Item NOT Read!");
                     }
-                    new_count++;
+
+                    new_items.push(item);
+                } else {
+                    // Existing item, reuse the item for now.
+                    new_items.push(existing);
                 }
             }
         } catch (e) {
@@ -147,10 +175,12 @@ FeedReader.prototype = {
             this.logger.debug(response);
         }
         /* Were there any new items? */
-        if (new_count > 0) {
-            global.log("Fetched " + new_count + " new items from " + this.url);
+        if (unread_items.length > 0) {
+            global.log("Fetched " + unread_items.length + " new items from " + this.url);
             try{
                 this.items = new_items;
+                // Update the saved items so we can keep track of new and unread items.
+                this.save_items();
                 this.callbacks.onUpdate();
 
                 if(unread_items.length == 1) {
@@ -158,20 +188,44 @@ FeedReader.prototype = {
                 } else if(unread_items.length > 1) {
                     this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
                 }
+
             } catch (e){
                 this.logger.error(e);
             }
         }
+
+        // Make items available even on the first load.
+        if (this.items.length == 0 && new_items.length > 0){
+            this.items = new_items;
+            this.callbacks.onUpdate();
+        }
+
+        let time =  new Date().getTime() - start;
+
+        this.logger.debug("Processing Items took: " + time + " ms");
+
     },
 
     mark_all_items_read: function() {
         this.logger.debug("FeedReader.mark_all_items_read");
+
         for (var i = 0; i < this.items.length; i++)
-            this.items[i].mark_read();
+            this.items[i].mark_read(false);
+
         this.save_items();
     },
 
-    save_items: function() {
+    on_item_read: function() {
+        this.logger.debug("FeedReader.on_item_read");
+        this.save_items();
+    },
+
+    on_item_deleted: function() {
+        this.logger.debug("FeedReader.on_item_deleted");
+        this.save_items();
+    },
+
+    save_items: function(){
         this.logger.debug("FeedReader.save_items");
         try {
             var dir = Gio.file_parse_name(this.path);
@@ -191,18 +245,25 @@ FeedReader.prototype = {
             var fs = file.replace(null, false,
                     Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 
-            let read_list = [];
+            let item_list = [];
             for (var i = 0; i < this.items.length; i++) {
-                if (this.items[i].read == true)
-                    read_list.push({ "id" : this.items[i].id });
+                item_list.push({
+                    "id": this.items[i].id,
+                    "read": this.items[i].read,
+                    "deleted": this.items[i].deleted,
+                });
             }
 
-            var data = {
-                "title": this.title,
-                "read_list": read_list,
+            // Update the item status
+            this.item_status = item_list;
+
+            let data = {
+                "feed_title": this.title,
+                "item_list": item_list,
             };
 
             let output = escape(JSON.stringify(data));
+
             let to_write = output.length;
             while (to_write > 0) {
                 to_write -= fs.write(output , null);
@@ -213,10 +274,12 @@ FeedReader.prototype = {
         }
     },
 
+    // Version 2 will load all items which have been saved to file.
     load_items: function() {
         this.logger.debug("FeedReader.load_items");
         try {
             let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
+            //var content = Cinnamon.get_file_contents_utf8_sync(path);
             var content = Cinnamon.get_file_contents_utf8_sync(path);
         } catch (e) {
             /* This is fine for new feeds */
@@ -230,15 +293,17 @@ FeedReader.prototype = {
 
             if (typeof data == "object") {
                 /* Load feedreader data */
-                if (data.title != undefined)
-                    this.title = data.title;
+                if (data.feed_title != undefined)
+                    this.title = data.feed_title;
                 else
                     this.title = _("Loading feed");
 
-                if (data.read_list != undefined)
-                    this.read_list = data.read_list;
+                if (data.item_list != undefined)
+                    this.item_status = data.item_list;
                 else
-                    this.read_list = new Array();
+                    this.item_status = new Array();
+
+                this.logger.debug("Number Loaded: " + this.item_status.length);
             } else {
                 global.logError('Invalid data file for ' + this.url);
             }
@@ -248,54 +313,14 @@ FeedReader.prototype = {
         }
     },
 
-    _fetch_image: function() {
-        this.logger.debug("FeedReader._fetch_image");
-        if (this.image.url == undefined || this.image.url == '')
-            return;
-
-        /* Use local file if it already exists */
-        let f = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
-        if (f.query_exists(null)) {
-            this.image.path = f.get_path();
-            return;
-        }
-
-        /* Request image url */
-        let msg = Soup.Message.new('GET', this.image.url);
-        this.session.queue_message(msg,
-                Lang.bind(this, this._on_img_response));
-    },
-
-    _on_img_response: function(session, message) {
-        this.logger.debug("FeedReader._on_img_response");
-        if (message.status_code != 200) {
-            global.logError('HTTP request for ' + this.url + ' returned ' + message.status_code);
-            return;
-        }
-
-        try {
-            var dir = Gio.file_parse_name(this.path);
-            if (!dir.query_exists(null)) {
-                dir.make_directory_with_parents(null);
+    get_unread_count: function() {
+        let count = 0;
+        for (var i = 0; i < this.item_status.length; i++) {
+            if (!this.item_status[i].read){
+                count++;
             }
-
-            let file = Gio.file_parse_name(this.path + '/' + sanitize_url(this.image.url));
-            let fs = file.replace(null, false,
-                    Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-
-            var to_write = message.response_body.length;
-            while (to_write > 0) {
-                to_write -= fs.write(message.response_body.get_chunk(message.response_body.length - to_write).get_data(),
-                        null, to_write);
-            }
-            fs.close(null);
-
-            this.image.path = file.get_path();
-            this.callbacks.onUpdate();
-        } catch (e) {
-            global.log("Error saving feed image for " + this.url + ": " + e);
-            this.image.path = undefined;
         }
+        return count;
     },
 
     _get_item_by_id: function(id) {
@@ -306,14 +331,15 @@ FeedReader.prototype = {
         return null;
     },
 
-    _is_in_read_list: function(id) {
-        for (var i = 0; i < this.read_list.length; i++) {
-            if (this.read_list[i].id == id)
+    _is_item_read: function(id){
+        this.logger.debug("Total Read Items: " + this.item_status.length);
+        this.logger.debug("Searching for: " + id);
+        for (var i = 0; i < this.item_status.length; i++) {
+            if (this.item_status[i].id == id && this.item_status[i].read)
                 return true;
         }
         return false;
     },
-
     /* Fatal error handler
      *
      * Log error state and report to application
@@ -329,47 +355,61 @@ FeedReader.prototype = {
 
         return 1;
     },
+
+    html2text: function(html) {
+        /* Convert html to plaintext */
+        let ret = html.replace('<br/>', '\n');
+        ret = ret.replace('</p>','\n');
+        ret = ret.replace(/<\/h[0-9]>/g, '\n\n');
+        ret = ret.replace(/<.*?>/g, '');
+        ret = ret.replace('&nbsp;', ' ');
+        ret = ret.replace('&quot;', '"');
+        ret = ret.replace('&rdquo;', '"');
+        ret = ret.replace('&ldquo;', '"');
+        ret = ret.replace('&#8220;', '"');
+        ret = ret.replace('&#8221;', '"');
+        ret = ret.replace('&rsquo;', '\'');
+        ret = ret.replace('&lsquo;', '\'');
+        ret = ret.replace('&#8216;', '\'');
+        ret = ret.replace('&#8217;', '\'');
+        ret = ret.replace('&#8230;', '...');
+        return ret;
+    },
+
+    html2pango: function(html){
+        let ret = html;
+        let esc_open = '-@~]';
+        let esc_close= ']~@-';
+
+        /* </p> <br/> --> newline */
+        ret = ret.replace('<br/>', '\n').replace('</p>','\n');
+
+        /* &nbsp; --> space */
+        ret = ret.replace(/&nbsp;/g, ' ');
+
+        /* Headings --> <b> + 2*newline */
+        ret = ret.replace(/<h[0-9]>/g, esc_open+'span weight="bold"'+esc_close);
+        ret = ret.replace(/<\/h[0-9]>\s*/g, esc_open+'/span'+esc_close+'\n\n');
+
+        /* <strong> -> <b> */
+        ret = ret.replace('<strong>', esc_open+'b'+esc_close);
+        ret = ret.replace('</strong>', esc_open+'/b'+esc_close);
+
+        /* <i> -> <i> */
+        ret = ret.replace('<i>', esc_open+'i'+esc_close);
+        ret = ret.replace('</i>', esc_open+'/i'+esc_close);
+
+        /* Strip remaining tags */
+        ret = ret.replace(/<.*?>/g, '');
+
+        /* Replace escaped <, > with actual angle-brackets */
+        let re1 = new RegExp(esc_open, 'g');
+        let re2 = new RegExp(esc_close, 'g');
+        ret = ret.replace(re1, '<').replace(re2, '>');
+
+        return ret;
+    },
 };
-
-/* Convert html to plaintext */
-function html2text(html) {
-    return html.replace('<br/>', '\n').replace('</p>','\n').replace(/<\/h[0-9]>/g, '\n\n').replace(/<.*?>/g, '').replace('&nbsp;', ' ').replace('&quot;', '"').replace('&rdquo;', '"').replace('&ldquo;', '"').replace('&#8220;', '"').replace('&#8221;', '"').replace('&rsquo;', '\'').replace('&lsquo;', '\'').replace('&#8216;', '\'').replace('&#8217;', '\'').replace('&#8230;', '...');
-}
-
-/* Convert html to (basic) Gnome Pango markup */
-function html2pango(html) {
-    let ret = html;
-    let esc_open = '-@~]';
-    let esc_close= ']~@-';
-
-    /* </p> <br/> --> newline */
-    ret = ret.replace('<br/>', '\n').replace('</p>','\n');
-
-    /* &nbsp; --> space */
-    ret = ret.replace(/&nbsp;/g, ' ');
-
-    /* Headings --> <b> + 2*newline */
-    ret = ret.replace(/<h[0-9]>/g, esc_open+'span weight="bold"'+esc_close);
-    ret = ret.replace(/<\/h[0-9]>\s*/g, esc_open+'/span'+esc_close+'\n\n');
-
-    /* <strong> -> <b> */
-    ret = ret.replace('<strong>', esc_open+'b'+esc_close);
-    ret = ret.replace('</strong>', esc_open+'/b'+esc_close);
-
-    /* <i> -> <i> */
-    ret = ret.replace('<i>', esc_open+'i'+esc_close);
-    ret = ret.replace('</i>', esc_open+'/i'+esc_close);
-
-    /* Strip remaining tags */
-    ret = ret.replace(/<.*?>/g, '');
-
-    /* Replace escaped <, > with actual angle-brackets */
-    let re1 = new RegExp(esc_open, 'g');
-    let re2 = new RegExp(esc_close, 'g');
-    ret = ret.replace(re1, '<').replace(re2, '>');
-
-    return ret;
-}
 
 function sanitize_url(url) {
     return url.replace(/.*:\/\//, '').replace(/\//g,'--');

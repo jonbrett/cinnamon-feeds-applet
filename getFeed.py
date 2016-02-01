@@ -32,5 +32,11 @@ if __name__ == "__main__":
         itemInfo["link"] = item["link"]
         itemInfo["description"] = item["description"]
         info["entries"].append(itemInfo)
-    
+        if "pubDate" in item:
+            itemInfo["pubDate"] = item["pubDate"]
+        elif "published" in item:
+            itemInfo["pubDate"] = item["published"]
+        else:
+            itemInfo["pubDate"] = None
+
     print json.dumps(info)
