@@ -158,10 +158,8 @@ FeedReader.prototype = {
                     // check if already read
                     if(this._is_item_read(item.id)){
                         item.read = true;
-                        this.logger.debug("Item Read!");
                     } else {
                         unread_items.push(item);
-                        this.logger.debug("Item NOT Read!");
                     }
 
                     new_items.push(item);
@@ -332,8 +330,6 @@ FeedReader.prototype = {
     },
 
     _is_item_read: function(id){
-        this.logger.debug("Total Read Items: " + this.item_status.length);
-        this.logger.debug("Searching for: " + id);
         for (var i = 0; i < this.item_status.length; i++) {
             if (this.item_status[i].id == id && this.item_status[i].read)
                 return true;

@@ -255,6 +255,7 @@ FeedApplet.prototype = {
                         show_feed_image: this.show_feed_image,
                         custom_title: url_list[i].title
                     });
+
             this.menu.addMenuItem(this.feeds[i]);
         }
     },
@@ -518,15 +519,17 @@ FeedDisplayMenuItem.prototype = {
                 }
             );
 
-        // Force a load of items here
-        this.refresh();
-
         if(!params.custom_title)
             this.rssTitle = this.reader.title;
         else
             this.rssTitle = params.custom_title;
 
         this._title.set_text(this.rssTitle);
+
+        this.title_length = (this._title.length > MIN_MENU_WIDTH) ? this._title.length : MIN_MENU_WIDTH;
+
+        // Force a load of items here
+        this.refresh();
 
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
@@ -554,7 +557,10 @@ FeedDisplayMenuItem.prototype = {
         this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
         let menu_items = 0;
         this.unread_count = 0;
-        let width = MIN_MENU_WIDTH;
+
+
+        // Need to find the maximum length, but we wont know that until the feed is updated
+        this.logger.debug("Title Length: " + this.title_length);
 
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
             if (this.reader.items[i].read && !this.show_read_items)
@@ -563,7 +569,7 @@ FeedDisplayMenuItem.prototype = {
             if (!this.reader.items[i].read)
                 this.unread_count++;
 
-            let item = new FeedMenuItem(this, this.reader.items[i], width, this.logger);
+            let item = new FeedMenuItem(this, this.reader.items[i], this.title_length, this.logger);
             item.connect('item-read', Lang.bind(this, function () { this.update(); }));
             this.menu.addMenuItem(item);
 
@@ -578,6 +584,7 @@ FeedDisplayMenuItem.prototype = {
         this._title.set_text(this.get_title());
         this.owner.update();
     },
+
     refresh: function() {
         this.logger.debug("FeedDisplayMenuItem.refresh");
         this.reader.get();
@@ -613,6 +620,7 @@ FeedDisplayMenuItem.prototype = {
 
         return false;
     },
+
     toggleMenu: function() {
         this.logger.debug("toggle sub menu options.");
         this.logger.debug("Current Number of MenuItems: " + this.menu.length);
@@ -672,11 +680,11 @@ FeedMenuItem.prototype = {
         this.label = new St.Label({text: age + item.title});
 
         let box = new St.BoxLayout({ style_class: 'popup-combobox-item' });
-        box.set_width(MIN_MENU_WIDTH);
+        box.set_width(width);
 
         box.add(this.icon, {span: 0});
         box.add(this.label, {expand: true, span: 1, align: St.Align.START});
-        this.addActor(box);
+        this.addActor(box, { expand: true } );
 
         let description = item.title  +  '\n' +
                 'Published: ' + item.published  +  '\n\n' +
