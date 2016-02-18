@@ -600,14 +600,19 @@ FeedDisplayMenuItem.prototype = {
 
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("FeedDisplayMenuItem Button Pressed Event: " + event.get_button());
-
+/*
         if(event.get_button() == 3){
             this.toggleMenu();
             return true;
         }
+*/
+        if(event.get_button() == 1 || event.get_button() == 3){
+            // Right click, toggle the options menu
+            if(event.get_button() == 3){
+                this.toggleMenu();
+            }
 
-        if(event.get_button() == 1){
-            // Left click, toggle the menu if its not already open.
+            // click, toggle the menu if its not already open.
             this.logger.debug(this.open);
             this.open = true;
             if (this.open)
@@ -725,6 +730,7 @@ FeedMenuItem.prototype = {
             return true;
         }
 
+        // Is this feed expanded?
         if(event.get_button() == 3){
             this.logger.debug("Show Submenu");
             this.toggleMenu();
