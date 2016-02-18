@@ -13,7 +13,8 @@
         "type" : "generic",
         "default" : "http://fxfeeds.mozilla.com/en-US/firefox/headlines.xml",
         "description" : "Feed URL(s)",
-        "tooltip" : "Enter the URLs of a valid RSS/Atom feed, one feed per line"
+        "tooltip" : "Enter the URLs of a valid RSS/Atom feed, one feed per line",
+        "value": "http://fxfeeds.mozilla.com/en-US/firefox/headlines.xml\nhttp://www.linuxmint.com/planet/rss20.xml\nhttp://segfault.linuxmint.com/feed/\n"
     },
     "max_items": {
             "type" : "scale",
