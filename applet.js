@@ -478,7 +478,7 @@ FeedDisplayMenuItem.prototype = {
         this._title = new St.Label({ text: "loading",
             style_class: 'feedreader-title-label'
         });
-
+        this.actor.set_style_class
         this.addActor(this._title, {expand: true, align: St.Align.START});
 
         this._triangleBin = new St.Bin({ x_align: St.Align.END });
@@ -558,10 +558,6 @@ FeedDisplayMenuItem.prototype = {
         let menu_items = 0;
         this.unread_count = 0;
 
-
-        // Need to find the maximum length, but we wont know that until the feed is updated
-        this.logger.debug("Title Length: " + this.title_length);
-
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
             if (this.reader.items[i].read && !this.show_read_items)
                 continue;
@@ -582,7 +578,20 @@ FeedDisplayMenuItem.prototype = {
 
         /* Append unread_count to title */
         this._title.set_text(this.get_title());
-        this.owner.update();
+
+        // If we are showing the action items then reshow them.
+        if(this.show_action_items && this.unread_count > 0){
+            this.show_action_items = false;
+            this.toggleMenu();
+            // Show this feed again.
+            this.owner.update();
+            this.owner.toggle_feeds(this);
+        } else {
+            this.show_action_items = false;
+            this.owner.update();
+            this.owner.toggle_feeds(null);
+        }
+
     },
 
     refresh: function() {
@@ -628,12 +637,15 @@ FeedDisplayMenuItem.prototype = {
 
     toggleMenu: function() {
         this.logger.debug("toggle sub menu options.");
-        this.logger.debug("Current Number of MenuItems: " + this.menu.length);
+
+        // Number of menu items added / removed
+        let menuItemCount = 2;
+
         if(this.show_action_items){
             // Remove the items.
             let children = this.menu.box.get_children();
 
-            for(let i = 0; i < 1 && i < children.length; i++)
+            for(let i = 0; i < menuItemCount && i < children.length; i++)
                 this.menu.box.remove_actor(children[i]);
             this.show_action_items = false;
         } else {
@@ -643,6 +655,10 @@ FeedDisplayMenuItem.prototype = {
 
             menuitem = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
             this.menu.addMenuItem(menuitem, 0);
+
+            menuitem = new ApplicationContextMenuItem(this, _("Mark Next " + this.max_items + " Posts Read"), "mark_next_read");
+            this.menu.addMenuItem(menuitem, 0);
+
             this.show_action_items = true;
         }
     },
@@ -663,7 +679,6 @@ FeedMenuItem.prototype = {
         this.show_action_items = false;
 
         this.menu = new PopupMenu.PopupSubMenu(this.actor);
-        this.logger.debug("Is item read? : " + item.read);
         this.item = item;
         if (this.item.read){
                 this._icon_name = 'feed-symbolic';
@@ -840,12 +855,26 @@ ApplicationContextMenuItem.prototype = {
                     this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
-                    this._appButton.owner.toggle_feeds();
+                    //this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
 
                 break;
+            case "mark_next_read":
+                global.log("Marking next " + this._appButton.max_items + " items read");
+                try {
+                    this._appButton.menu.close();
+                    this._appButton.reader.mark_next_items_read(this._appButton.max_items);
+                    this._appButton.update();
+                    // Reshow this feed if not done?
+                    //this._appButton.owner.toggle_feeds();
+                } catch (e){
+                    global.log("error: " + e);
+                }
+
+                break;
+
             case "delete_all_items":
                 global.log("Marking all items 'deleted'");
 

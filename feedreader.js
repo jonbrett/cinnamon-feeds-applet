@@ -213,6 +213,23 @@ FeedReader.prototype = {
         this.save_items();
     },
 
+    mark_next_items_read: function(number) {
+        this.logger.debug("FeedReader.mark_next_items_read(" + number + ")");
+
+        // Mark next unread n items read
+        let marked = 0;
+        for (var i = 0; i < this.items.length; i++){
+            if(!this.items[i].read){
+                marked++;
+                this.items[i].mark_read(false);
+            }
+            // only mark the number of items read that we specify.
+            if (marked == number)
+                break;
+        }
+        this.save_items();
+    },
+
     on_item_read: function() {
         this.logger.debug("FeedReader.on_item_read");
         this.save_items();
