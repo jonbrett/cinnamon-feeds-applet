@@ -100,6 +100,14 @@ FeedApplet.prototype = {
 
         this.build_context_menu();
         this.update();
+
+        this.timeout = this.refresh_interval_mins * 60 * 1000;
+        this.logger.debug("Initial timeout set in: " + this.timeout + " ms");
+        /* Set the next timeout */
+        this.timer_id = Mainloop.timeout_add(this.timeout,
+                Lang.bind(this, this.refresh_tick));
+
+        this.logger.debug("timer_id: " + this.timer_id);
     },
 
     init_settings: function(instance_id) {
@@ -238,7 +246,6 @@ FeedApplet.prototype = {
         this.menu.removeAll();
 
         // Feed Level Menu Items Added Here (each Feed includes posts).
-
         for(var i = 0; i < url_list.length; i++) {
             this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
@@ -248,14 +255,9 @@ FeedApplet.prototype = {
                         show_feed_image: this.show_feed_image,
                         custom_title: url_list[i].title
                     });
+
             this.menu.addMenuItem(this.feeds[i]);
         }
-
-        if (this.feeds.length > 0)
-            this.feed_to_show = this.feeds[0];
-
-        this.logger.debug("on_feeds_changed calling refresh");
-        this.refresh_tick();
     },
 
     /* Called by Feed Display items to notify of changes to
@@ -267,10 +269,10 @@ FeedApplet.prototype = {
         let tooltip = "";
 
         for (var i = 0; i < this.feeds.length; i++) {
+            // TODO: We can just check if there are unread feeds here and drop the incrementing count
             unread_count += this.feeds[i].get_unread_count();
             if (i != 0)
                 tooltip += "\n";
-            //tooltip += this.feeds[i].get_title() + "[" + this.feeds[i].get_unread_count() + "]";
             tooltip += this.feeds[i].get_title();
         }
 
@@ -312,9 +314,9 @@ FeedApplet.prototype = {
             this.timer_id = 0;
         }
         this.logger.debug("Updating all feed display items");
+
         /* Update all feed display items */
         for (var i = 0; i < this.feeds.length; i++) {
-
             this.feeds[i].refresh();
         }
 
@@ -384,8 +386,6 @@ FeedApplet.prototype = {
                 this.feeds[i].menu.close(true);
             }
         }
-
-
     },
 
     _read_manage_app_stdout: function() {
@@ -478,7 +478,7 @@ FeedDisplayMenuItem.prototype = {
         this._title = new St.Label({ text: "loading",
             style_class: 'feedreader-title-label'
         });
-
+        this.actor.set_style_class
         this.addActor(this._title, {expand: true, align: St.Align.START});
 
         this._triangleBin = new St.Bin({ x_align: St.Align.END });
@@ -511,11 +511,11 @@ FeedDisplayMenuItem.prototype = {
         this.reader = new FeedReader.FeedReader(
                 this.logger,
                 url,
-                '~/.cinnamon/' + UUID + '/' + owner.instance_id,
+                '~/.cinnamon/' + UUID,
                 {
                     'onUpdate' : Lang.bind(this, this.update),
                     'onError' : Lang.bind(this, this.error),
-                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification)
+                    'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification),
                 }
             );
 
@@ -526,30 +526,37 @@ FeedDisplayMenuItem.prototype = {
 
         this._title.set_text(this.rssTitle);
 
+        this.title_length = (this._title.length > MIN_MENU_WIDTH) ? this._title.length : MIN_MENU_WIDTH;
+
+        // Force a load of items here
+        this.refresh();
+
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
+
     get_title: function() {
         let title =  this.custom_title || this.reader.title;
-        title += " [" + this.unread_count + "]";
+        title += " [" + this.reader.get_unread_count() + " / " + this.reader.items.length + "]";
         return title;
     },
+
     get_unread_count: function() {
         return this.unread_count;
     },
+
     error: function(reader, message, full_message) {
         this.menu.removeAll();
 
         this.menu.addMenuItem(new LabelMenuItem(
                     message, full_message));
     },
+
     update: function() {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
-
-        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + "total items");
+        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
         let menu_items = 0;
         this.unread_count = 0;
-        let width = MIN_MENU_WIDTH;
 
         for (var i = 0; i < this.reader.items.length && menu_items < this.max_items; i++) {
             if (this.reader.items[i].read && !this.show_read_items)
@@ -558,7 +565,7 @@ FeedDisplayMenuItem.prototype = {
             if (!this.reader.items[i].read)
                 this.unread_count++;
 
-            let item = new FeedMenuItem(this.reader.items[i], width, this.logger);
+            let item = new FeedMenuItem(this, this.reader.items[i], this.title_length, this.logger);
             item.connect('item-read', Lang.bind(this, function () { this.update(); }));
             this.menu.addMenuItem(item);
 
@@ -571,8 +578,22 @@ FeedDisplayMenuItem.prototype = {
 
         /* Append unread_count to title */
         this._title.set_text(this.get_title());
-        this.owner.update();
+
+        // If we are showing the action items then reshow them.
+        if(this.show_action_items && this.unread_count > 0){
+            this.show_action_items = false;
+            this.toggleMenu();
+            // Show this feed again.
+            this.owner.update();
+            this.owner.toggle_feeds(this);
+        } else {
+            this.show_action_items = false;
+            this.owner.update();
+            this.owner.toggle_feeds(null);
+        }
+
     },
+
     refresh: function() {
         this.logger.debug("FeedDisplayMenuItem.refresh");
         this.reader.get();
@@ -589,13 +610,13 @@ FeedDisplayMenuItem.prototype = {
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("FeedDisplayMenuItem Button Pressed Event: " + event.get_button());
 
-        if(event.get_button() == 3){
-            this.toggleMenu();
-            return true;
-        }
+        if(event.get_button() == 1 || event.get_button() == 3){
+            // Right click, toggle the options menu
+            if(event.get_button() == 3){
+                this.toggleMenu();
+            }
 
-        if(event.get_button() == 1){
-            // Left click, toggle the menu if its not already open.
+            // click, toggle the menu if its not already open.
             this.logger.debug(this.open);
             this.open = true;
             if (this.open)
@@ -608,14 +629,18 @@ FeedDisplayMenuItem.prototype = {
 
         return false;
     },
+
     toggleMenu: function() {
         this.logger.debug("toggle sub menu options.");
-        this.logger.debug("Current Number of MenuItems: " + this.menu.length);
+
+        // Number of menu items added / removed
+        let menuItemCount = 2;
+
         if(this.show_action_items){
             // Remove the items.
             let children = this.menu.box.get_children();
 
-            for(let i = 0; i < 1 && i < children.length; i++)
+            for(let i = 0; i < menuItemCount && i < children.length; i++)
                 this.menu.box.remove_actor(children[i]);
             this.show_action_items = false;
         } else {
@@ -625,6 +650,10 @@ FeedDisplayMenuItem.prototype = {
 
             menuitem = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
             this.menu.addMenuItem(menuitem, 0);
+
+            menuitem = new ApplicationContextMenuItem(this, _("Mark Next " + this.max_items + " Posts Read"), "mark_next_read");
+            this.menu.addMenuItem(menuitem, 0);
+
             this.show_action_items = true;
         }
     },
@@ -638,13 +667,13 @@ function FeedMenuItem() {
 FeedMenuItem.prototype = {
     __proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 
-    _init: function (item, width, logger, params) {
+    _init: function (parent, item, width, logger, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+        this.parent = parent;
         this.logger = logger;
         this.show_action_items = false;
 
         this.menu = new PopupMenu.PopupSubMenu(this.actor);
-
         this.item = item;
         if (this.item.read){
                 this._icon_name = 'feed-symbolic';
@@ -660,18 +689,23 @@ FeedMenuItem.prototype = {
                 icon_type: this.icon_type,
                 style_class: 'popup-menu-icon' });
 
-        this.label = new St.Label({text: FeedReader.html2text(item.title)});
+        // Calculate the age of the post, hours or days only
+        let age = this.calculate_age(item.published);
+
+        this.label = new St.Label({text: age + item.title});
 
         let box = new St.BoxLayout({ style_class: 'popup-combobox-item' });
-        box.set_width(MIN_MENU_WIDTH);
+        box.set_width(width);
 
         box.add(this.icon, {span: 0});
         box.add(this.label, {expand: true, span: 1, align: St.Align.START});
-        this.addActor(box);
+        this.addActor(box, { expand: true } );
 
-        this.tooltip = new Tooltips.Tooltip(this.actor,
-                FeedReader.html2text(item.title) + '\n\n' +
-                FeedReader.html2text(item.description));
+        let description = item.title  +  '\n' +
+                'Published: ' + item.published  +  '\n\n' +
+                item.description_text;
+
+        this.tooltip = new Tooltips.Tooltip(this.actor, description);
 
         /* Some hacking of the underlying tooltip ClutterText to set wrapping,
          * format, etc */
@@ -682,9 +716,10 @@ FeedMenuItem.prototype = {
             this.tooltip._tooltip.get_clutter_text().set_line_wrap(true);
             this.tooltip._tooltip.get_clutter_text().set_markup(
                     '<span weight="bold">' +
-                    FeedReader.html2pango(item.title) +
-                    '</span>\n\n' +
-                    FeedReader.html2pango(item.description));
+                    item.title +
+                    '</span>\n' +
+                    'Published: ' + item.published  +  '\n\n' +
+                    item.description);
         } catch (e) {
             this.logger.debug("Error Tweaking Tooltip: " + e);
             /* If we couldn't tweak the tooltip format this is likely because
@@ -705,6 +740,7 @@ FeedMenuItem.prototype = {
             return true;
         }
 
+        // Is this feed expanded?
         if(event.get_button() == 3){
             this.logger.debug("Show Submenu");
             this.toggleMenu();
@@ -728,8 +764,12 @@ FeedMenuItem.prototype = {
         // Close sub menus if action has been taken.
         if(this.show_action_items)
             this.toggleMenu();
-        // This will close the menu.
+
         this.emit('item-read');
+
+        // Check and toggle feeds if this is the last item.
+        if(this.parent.get_unread_count() == 0)
+            this.parent.owner.toggle_feeds();
     },
 
     toggleMenu: function() {
@@ -764,6 +804,25 @@ FeedMenuItem.prototype = {
         }
         this.menu.toggle();
     },
+
+    calculate_age: function(published){
+        try {
+            let age = new Date().getTime() - published;
+            let h = Math.floor(age / (60 * 60 * 1000));
+            let d = Math.floor(age / (24 * 60 * 60 * 1000))
+
+            if(d > 0){
+                return "(" + d + "d) ";
+            } else if (h > 0) {
+                return "(" + h + "h) "
+            } else {
+                return "(<1h) ";
+            }
+        } catch (e){
+            this.logger.error(e);
+            return '';
+        }
+    },
 };
 
 function ApplicationContextMenuItem(appButton, label, action){
@@ -791,12 +850,23 @@ ApplicationContextMenuItem.prototype = {
                     this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
-                    this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
 
                 break;
+            case "mark_next_read":
+                global.log("Marking next " + this._appButton.max_items + " items read");
+                try {
+                    this._appButton.menu.close();
+                    this._appButton.reader.mark_next_items_read(this._appButton.max_items);
+                    this._appButton.update();
+                } catch (e){
+                    global.log("error: " + e);
+                }
+
+                break;
+
             case "delete_all_items":
                 global.log("Marking all items 'deleted'");
 
