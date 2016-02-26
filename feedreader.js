@@ -92,7 +92,6 @@ FeedReader.prototype = {
         /* Feed data */
         this.title = "";
         this.items = new Array();
-        //this.read_list = new Array();
 
         this.image = {}
 

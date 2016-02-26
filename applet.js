@@ -609,12 +609,7 @@ FeedDisplayMenuItem.prototype = {
 
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("FeedDisplayMenuItem Button Pressed Event: " + event.get_button());
-/*
-        if(event.get_button() == 3){
-            this.toggleMenu();
-            return true;
-        }
-*/
+
         if(event.get_button() == 1 || event.get_button() == 3){
             // Right click, toggle the options menu
             if(event.get_button() == 3){
@@ -855,7 +850,6 @@ ApplicationContextMenuItem.prototype = {
                     this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
-                    //this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
@@ -867,8 +861,6 @@ ApplicationContextMenuItem.prototype = {
                     this._appButton.menu.close();
                     this._appButton.reader.mark_next_items_read(this._appButton.max_items);
                     this._appButton.update();
-                    // Reshow this feed if not done?
-                    //this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
