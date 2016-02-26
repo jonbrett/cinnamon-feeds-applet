@@ -1,3 +1,9 @@
+0.18
+====
+- Fixed width of FeedItem to match width and not cut the title shorter than needed. #69
+- Added option to mark current view read, allowing handling fast moving feeds easier. #63
+- Added segfault and mint as default feeds. #44
+
 0.17
 ====
 - Improved interface display and actions [Issues #67, #66, #64, #62]
