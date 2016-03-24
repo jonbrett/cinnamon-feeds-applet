@@ -45,6 +45,8 @@ const Util = imports.misc.util;
 const _ = Gettext.gettext;
 const Clutter = imports.gi.Clutter;
 const Logger = imports.log_util;
+const MessageTray = imports.ui.messageTray;
+const Main = imports.ui.main;
 
 /*  Application hook */
 function main(metadata, orientation, panel_height, instance_id) {
@@ -337,7 +339,8 @@ FeedApplet.prototype = {
         this.toggle_feeds(null);
     },
 
-    new_item_notification: function(feedtitle, itemtitle) {
+    // TODO: Fix notifications area 1
+    new_item_notification: function(feed, feedtitle, itemtitle) {
         this.logger.debug("FeedApplet.new_item_notification");
         /* Displays a popup notification using notify-send */
 
@@ -347,12 +350,14 @@ FeedApplet.prototype = {
             return;
         }
 
-        let iconpath = this.path + "/icon.png";
+        this._notifyMessage(feed, feedtitle, itemtitle);
+    },
 
-        let command = 'notify-send -i ' + iconpath + ' "' + feedtitle + '" "' + itemtitle + '"';
-
-        this.logger.debug("Executing Command: " + command);
-        GLib.spawn_command_line_async(command);
+    item_read_notification: function(feed){
+        this.logger.debug("FeedApplet.item_read_notification");
+        if(this.notifications_enabled) {
+            this._destroyMessage(feed);
+        }
     },
 
     toggle_feeds: function(feed_to_show) {
@@ -460,8 +465,67 @@ FeedApplet.prototype = {
             Mainloop.source_remove(this.timer_id);
             this.timer_id = 0;
         }
+    },
+
+    _ensureSource: function() {
+        this.logger.debug("FeedApplet._ensureSource");
+        if(!this._source) {
+            let gicon = Gio.icon_new_for_string(this.path + "/icon.png");
+            let icon = new St.Icon({ gicon: gicon});
+
+            this._source = new FeedMessageTraySource("RSS Feed Notification", icon);
+            //this._source = new FeedMessageTraySource();
+            this._source.connect('destroy', Lang.bind(this, function(){
+                this._source = null;
+            }));
+            if (Main.messageTray) Main.messageTray.add(this._source);
+        }
+    },
+
+    _notifyMessage: function(feed, title, text){
+        this.logger.debug("FeedApplet._notifyMessage");
+        if(feed._notification)
+            feed._notification.destroy();
+
+        this._ensureSource();
+
+        let gicon = Gio.icon_new_for_string(this.path + "/icon.png");
+        let icon = new St.Icon({ gicon: gicon});
+        feed._notification = new MessageTray.Notification(this._source, title, text, {icon: icon});
+        feed._notification.setTransient(false);
+        feed._notification.connect('destroy', function(){
+            feed._notification = null;
+        });
+
+        this._source.notify(feed._notification);
+    },
+
+    _destroyMessage: function(feed){
+        this.logger.debug("FeedApplet._destroyMessage");
+        if(feed._notification){
+            feed._notification.destroy();
+        }
+    },
+};
+
+function FeedMessageTraySource() {
+    this._init();
+}
+
+FeedMessageTraySource.prototype = {
+    __proto__: MessageTray.Source.prototype,
+
+    _init: function() {
+        MessageTray.Source.prototype._init.call(this, _("Feeds"));
+
+        let gicon = Gio.icon_new_for_string(this.path + "/icon.png");
+        let icon = new St.Icon({ gicon: gicon});
+
+        this._setSummaryIcon(icon);
     }
 };
+
+
 
 /* Menu item for displaying the feed title*/
 function FeedDisplayMenuItem() {
@@ -516,6 +580,7 @@ FeedDisplayMenuItem.prototype = {
                     'onUpdate' : Lang.bind(this, this.update),
                     'onError' : Lang.bind(this, this.error),
                     'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification),
+                    'onItemRead' : Lang.bind(this.owner, this.owner.item_read_notification),
                 }
             );
 
