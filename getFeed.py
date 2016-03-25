@@ -1,15 +1,17 @@
-import feedparser, sys, json
+import feedparser
+import sys
+import json
 
 if __name__ == "__main__":
     rss = sys.argv[1]
     feed = feedparser.parse(rss)
-    info = {}
-    
-    info["title"] = feed["feed"]["title"]
-    info["description"] = feed["feed"]["description"]
-    info["link"] = feed["feed"]["link"]
-    
-    #image is optional in the rss spec
+    info = {
+        "title": feed["feed"]["title"],
+        "description": feed["feed"]["description"],
+        "link": feed["feed"]["link"]
+            }
+
+    # image is optional in the rss spec
     if "image" in feed["feed"]:
         imageInfo = {}
         try:
@@ -17,13 +19,13 @@ if __name__ == "__main__":
             imageInfo["width"] = feed["feed"]["image"]["width"]
             imageInfo["height"] = feed["feed"]["image"]["height"]
             info["image"] = imageInfo
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write(str(e.args))
 
     info["entries"] = []
     for item in feed["entries"]:
         itemInfo = {}
-        #guid is optional, so use link if it's not given
+        # guid is optional, so use link if it's not given
         if "guid" in item:
             itemInfo["id"] = item["guid"]
         else:
@@ -39,4 +41,4 @@ if __name__ == "__main__":
         else:
             itemInfo["pubDate"] = None
 
-    print json.dumps(info)
+    print(json.dumps(info))
