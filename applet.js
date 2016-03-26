@@ -423,7 +423,7 @@ FeedApplet.prototype = {
         this.logger.debug("FeedApplet.manage_feeds");
         try {
 
-            let argv = [this.path + "/manage_feeds.py"];
+            let argv = ["python", this.path + "/manage_feeds.py"];
             let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
                     null,
                     argv,
