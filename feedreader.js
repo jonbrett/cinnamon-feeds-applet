@@ -64,8 +64,9 @@ FeedItem.prototype = {
     mark_read: function(single = true) {
         this.read = true;
         // Only notify when marking individual items
-        if(single)
+        if(single) {
             this.emit('item-read');
+        }
     },
 
     delete_item: function() {
@@ -181,9 +182,9 @@ FeedReader.prototype = {
                 this.callbacks.onUpdate();
 
                 if(unread_items.length == 1) {
-                    this.callbacks.onNewItem(this.title, unread_items[0].title);
+                    this.callbacks.onNewItem(this, this.title, unread_items[0].title);
                 } else if(unread_items.length > 1) {
-                    this.callbacks.onNewItem(this.title, unread_items.length + " unread items!");
+                    this.callbacks.onNewItem(this, this.title, unread_items.length + " unread items!");
                 }
 
             } catch (e){
@@ -209,6 +210,7 @@ FeedReader.prototype = {
         for (var i = 0; i < this.items.length; i++)
             this.items[i].mark_read(false);
 
+        this.callbacks.onItemRead(this);
         this.save_items();
     },
 
@@ -226,11 +228,13 @@ FeedReader.prototype = {
             if (marked == number)
                 break;
         }
+        this.callbacks.onItemRead(this);
         this.save_items();
     },
 
     on_item_read: function() {
         this.logger.debug("FeedReader.on_item_read");
+        this.callbacks.onItemRead(this);
         this.save_items();
     },
 
