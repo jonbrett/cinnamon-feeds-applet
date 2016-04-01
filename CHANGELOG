@@ -1,3 +1,9 @@
+0.19
+====
+- Made notifications smarter, when feed is read the notification goes away. #73
+- Modified python to work in both python 2 and 3. #55 
+- Fixed manage feeds not working on Mint. #72
+- Fixed Mark All not working (Thanks @pehiv). #75
 0.18
 ====
 - Fixed width of FeedItem to match width and not cut the title shorter than needed. #69
