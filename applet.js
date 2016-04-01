@@ -421,6 +421,16 @@ FeedApplet.prototype = {
     manage_feeds: function() {
         this.logger.debug("FeedApplet.manage_feeds");
         try {
+            try {
+                Util.spawnCommandLine('chmod +x "' + this.path + '/manage_feeds.py"');
+                Util.spawnCommandLine('chown $USER "' + this.path + '/manage_feeds.py"');
+            } catch (e)
+            {
+                if(this.logger != undefined){
+                    this.logger.error(e);
+                }
+                global.logError(e);
+            }
 
             let argv = [this.path + "/manage_feeds.py"];
             let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
