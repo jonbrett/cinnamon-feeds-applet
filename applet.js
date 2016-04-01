@@ -339,7 +339,6 @@ FeedApplet.prototype = {
         this.toggle_feeds(null);
     },
 
-    // TODO: Fix notifications area 1
     new_item_notification: function(feed, feedtitle, itemtitle) {
         this.logger.debug("FeedApplet.new_item_notification");
         /* Displays a popup notification using notify-send */
@@ -423,7 +422,7 @@ FeedApplet.prototype = {
         this.logger.debug("FeedApplet.manage_feeds");
         try {
 
-            let argv = ["python", this.path + "/manage_feeds.py"];
+            let argv = [this.path + "/manage_feeds.py"];
             let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
                     null,
                     argv,
