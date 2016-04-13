@@ -5,9 +5,15 @@ import json
 if __name__ == "__main__":
     rss = sys.argv[1]
     feed = feedparser.parse(rss)
+
+    if 'description' in feed['feed']:
+        description = feed['feed']['description']
+    else:
+        description = feed['feed'].get('subtitle', '')
+
     info = {
         "title": feed["feed"]["title"],
-        "description": feed["feed"]["description"],
+        "description": description,
         "link": feed["feed"]["link"]
             }
 
