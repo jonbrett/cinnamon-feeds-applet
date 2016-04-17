@@ -164,8 +164,10 @@ FeedApplet.prototype = {
                 _("Mark all read"),
                 "object-select-symbolic",
                 Lang.bind(this, function() {
-                    for (var i = 0; i < this.feeds.length; i++)
-                        this.feeds[i].mark_all_items_read();
+                    for (var i = 0; i < this.feeds.length; i++) {
+                        this.feeds[i].reader.mark_all_items_read();
+                        this.feeds[i].update();
+                    }
                 }));
         this._applet_context_menu.addMenuItem(s);
 
