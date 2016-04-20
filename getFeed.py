@@ -4,47 +4,76 @@ import json
 
 if __name__ == "__main__":
     rss = sys.argv[1]
-    feed = feedparser.parse(rss)
 
-    if 'description' in feed['feed']:
-        description = feed['feed']['description']
-    else:
-        description = feed['feed'].get('subtitle', '')
+    info = {}
 
-    info = {
-        "title": feed["feed"]["title"],
-        "description": description,
-        "link": feed["feed"]["link"]
-            }
+    try:
+        parser = feedparser.parse(rss)
 
-    # image is optional in the rss spec
-    if "image" in feed["feed"]:
-        imageInfo = {}
-        try:
-            imageInfo["url"] = feed["feed"]["image"]["url"]
-            imageInfo["width"] = feed["feed"]["image"]["width"]
-            imageInfo["height"] = feed["feed"]["image"]["height"]
-            info["image"] = imageInfo
-        except Exception as e:
-            sys.stderr.write(str(e.args))
+        # Check for malformed feed
+        #if parser.bozo == 1:
+        #    info['bozo_message'] = parser.bozo_exception
 
-    info["entries"] = []
-    for item in feed["entries"]:
-        itemInfo = {}
-        # guid is optional, so use link if it's not given
-        if "guid" in item:
-            itemInfo["id"] = item["guid"]
+        # check for permanent redirect
+        if parser.status == 301:
+            info['redirect_url'] = parser.href
+        elif parser.status == 401:
+            raise Exception('Feed is password protected and not supported at this time.')
+        elif parser.status == 410:
+            raise Exception('Feed marked Gone, please remove and stop trying.')
+
+        feed = parser.feed
+
+        if 'title' in feed:
+            info['title'] = feed['title']
         else:
-            itemInfo["id"] = item["link"]
-        itemInfo["title"] = item["title"]
-        itemInfo["link"] = item["link"]
-        itemInfo["description"] = item["description"]
-        info["entries"].append(itemInfo)
-        if "pubDate" in item:
-            itemInfo["pubDate"] = item["pubDate"]
-        elif "published" in item:
-            itemInfo["pubDate"] = item["published"]
-        else:
-            itemInfo["pubDate"] = None
+            info['title'] = rss
 
+        if 'description' in feed:
+            info['description'] = feed['description']
+        else:
+            info['description'] = feed.get('subtitle', info['title'])
+
+        info['link'] = feed.get('link', rss)
+
+        # image is optional in the rss spec
+        if 'image' in feed:
+            image_info = {}
+            try:
+                image_info['url'] = feed['image']['url']
+                image_info['width'] = feed['image']['width']
+                image_info['height'] = feed['image']['height']
+                info['image'] = image_info
+            except Exception as e:
+                sys.stderr.write(str(e.args))
+
+        info['entries'] = []
+        for item in parser['entries']:
+            item_info = {}
+            # Invalid feeds will be excluded
+            try:
+                # guid is optional, so use link if it's not given
+                if 'guid' in item:
+                    item_info['id'] = item['guid']
+                else:
+                    item_info['id'] = item['link']
+
+                item_info['title'] = item['title']
+                item_info['link'] = item['link']
+                item_info['description'] = item.get('description', item_info['title'])
+
+                if 'pubDate' in item:
+                    item_info['pubDate'] = item['pubDate']
+                elif "published" in item:
+                    item_info['pubDate'] = item['published']
+                else:
+                    item_info['pubDate'] = None
+
+                info['entries'].append(item_info)
+            except Exception as e:
+                sys.stderr.write(str(e))
+    except Exception as e:
+        info['exception'] = e
+
+    # This print statement is the return value to the javascript.
     print(json.dumps(info))

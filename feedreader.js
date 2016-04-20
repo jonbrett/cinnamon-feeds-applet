@@ -124,8 +124,25 @@ FeedReader.prototype = {
 
         try{
             let info = JSON.parse(response);
+            // Check for error messages first:
+            if (info.bozo_message != undefined) {
+                this.logger.info("Possible Malformed Feed Detected: " + info.bozo_message);
+            }
+
+            if (info.exception != undefined){
+                // Invalid feed detected, throw and log error.
+                throw info.exception;
+            }
+
             this.title = info.title;
             this.logger.debug("Processing feed: " + info.title);
+
+            // Check if feed has a permanent redirect
+            if (info.redirect_url != undefined) {
+                this.logger.info("Feed has been redirected to (Please update feed): " + info.redirect_url);
+                // eventually need to address this more forcefully
+            }
+
             // Look for new items
             for (let i = 0; i < info.entries.length; i++) {
                 // We only need to process new items, so check if the item exists already
