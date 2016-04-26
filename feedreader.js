@@ -125,9 +125,6 @@ FeedReader.prototype = {
         try{
             let info = JSON.parse(response);
             // Check for error messages first:
-            if (info.bozo_message != undefined) {
-                this.logger.info("Possible Malformed Feed Detected: " + info.bozo_message);
-            }
 
             if (info.exception != undefined){
                 // Invalid feed detected, throw and log error.

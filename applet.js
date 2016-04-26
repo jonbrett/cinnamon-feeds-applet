@@ -273,7 +273,6 @@ FeedApplet.prototype = {
         let tooltip = "";
 
         for (var i = 0; i < this.feeds.length; i++) {
-            // TODO: We can just check if there are unread feeds here and drop the incrementing count
             unread_count += this.feeds[i].get_unread_count();
             if (i != 0)
                 tooltip += "\n";
@@ -654,6 +653,11 @@ FeedDisplayMenuItem.prototype = {
 
         /* Append unread_count to title */
         this._title.set_text(this.get_title());
+
+        if(this.unread_count > 0)
+            this.actor.style="color: orange;"
+        else
+            this.actor.style=""
 
         // If we are showing the action items then reshow them.
         if(this.show_action_items && this.unread_count > 0){

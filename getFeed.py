@@ -9,11 +9,6 @@ if __name__ == "__main__":
 
     try:
         parser = feedparser.parse(rss)
-
-        # Check for malformed feed
-        #if parser.bozo == 1:
-        #    info['bozo_message'] = parser.bozo_exception
-
         # check for permanent redirect
         if parser.status == 301:
             info['redirect_url'] = parser.href
