@@ -1,3 +1,7 @@
+0.20
+====
+- Added color to unread feeds #81
+- Fixed issue with feeds [Issues #80, #77]
 0.19
 ====
 - Made notifications smarter, when feed is read the notification goes away. #73
