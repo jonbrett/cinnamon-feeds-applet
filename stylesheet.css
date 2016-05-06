@@ -11,6 +11,18 @@
 
 }
 
+.feedreader-feed-hover {
+    background: Slategrey;
+}
+
+.feedreader-feed-new {
+    color: orange;
+}
+
+.feedreader-feed-selected {
+    background: DimGrey;
+}
+
 .feedreader-title-buttons {
     spacing: .5em;
 }

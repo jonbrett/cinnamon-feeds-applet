@@ -373,8 +373,10 @@ FeedApplet.prototype = {
         for (i in this.feeds) {
             if (this.feed_to_show == this.feeds[i]) {
                 this.feeds[i].menu.open(true);
+                this.feeds[i].actor.add_style_class_name('feedreader-feed-selected');
             } else {
                 this.feeds[i].menu.close(true);
+                this.feeds[i].actor.remove_style_class_name('feedreader-feed-selected');
             }
         }
     },
@@ -386,9 +388,11 @@ FeedApplet.prototype = {
         for (i in this.feeds) {
             if (!found && this.feeds[i].unread_count > 0) {
                 this.feeds[i].menu.open(true);
+                this.feeds[i].actor.add_style_class_name('feedreader-feed-selected');
                 found = true;
             } else {
                 this.feeds[i].menu.close(true);
+                this.feeds[i].actor.remove_style_class_name('feedreader-feed-selected');
             }
         }
     },
@@ -547,12 +551,14 @@ FeedDisplayMenuItem.prototype = {
 
     _init: function (url, owner, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+
+        //TODO: Add Box layout type to facilitate adding an icon?
         this.show_action_items = false;
         this.open = false;
         this._title = new St.Label({ text: "loading",
             style_class: 'feedreader-title-label'
         });
-        this.actor.set_style_class
+
         this.addActor(this._title, {expand: true, align: St.Align.START});
 
         this._triangleBin = new St.Bin({ x_align: St.Align.END });
@@ -605,7 +611,8 @@ FeedDisplayMenuItem.prototype = {
 
         // Force a load of items here
         this.refresh();
-
+        this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
+        this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
 
@@ -655,9 +662,9 @@ FeedDisplayMenuItem.prototype = {
         this._title.set_text(this.get_title());
 
         if(this.unread_count > 0)
-            this.actor.style="color: orange;"
+            this.actor.add_style_class_name('feedreader-feed-new');
         else
-            this.actor.style=""
+            this.actor.remove_style_class_name('feedreader-feed-new');
 
         // If we are showing the action items then reshow them.
         if(this.show_action_items && this.unread_count > 0){
@@ -704,6 +711,7 @@ FeedDisplayMenuItem.prototype = {
             else
                 this.owner.toggle_feeds(null);
 
+            this.actor.add_style_class_name('feedreader-feed-selected');
             return true;
         }
 
@@ -729,6 +737,7 @@ FeedDisplayMenuItem.prototype = {
             let menuitem;
 
             menuitem = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
+
             this.menu.addMenuItem(menuitem, 0);
 
             menuitem = new ApplicationContextMenuItem(this, _("Mark Next " + this.max_items + " Posts Read"), "mark_next_read");
@@ -736,6 +745,14 @@ FeedDisplayMenuItem.prototype = {
 
             this.show_action_items = true;
         }
+    },
+
+    _buttonEnterEvent: function(){
+        this.actor.add_style_class_name('feedreader-feed-hover');
+    },
+
+    _buttonLeaveEvent: function() {
+        this.actor.remove_style_class_name('feedreader-feed-hover');
     },
 };
 
@@ -811,6 +828,8 @@ FeedMenuItem.prototype = {
         this.connect('destroy', Lang.bind(this, function() {
             this.tooltip.destroy();
         }));
+        this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
+        this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
     },
 
     _onButtonReleaseEvent: function (actor, event) {
@@ -903,6 +922,14 @@ FeedMenuItem.prototype = {
             return '';
         }
     },
+
+    _buttonEnterEvent: function(){
+        this.actor.add_style_class_name('feedreader-feed-hover');
+    },
+
+    _buttonLeaveEvent: function() {
+        this.actor.remove_style_class_name('feedreader-feed-hover');
+    },
 };
 
 function ApplicationContextMenuItem(appButton, label, action){
@@ -913,12 +940,14 @@ ApplicationContextMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
     _init: function(appButton, label, action){
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {focusOnHover: false});
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
 
         this._appButton = appButton;
         this._action = action;
         this.label = new St.Label({ text: label });
         this.addActor(this.label);
+        this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
+        this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
     },
 
     activate: function(event){
@@ -961,10 +990,19 @@ ApplicationContextMenuItem.prototype = {
                 break;
         }
     },
+
     _onButtonReleaseEvent: function (actor, event) {
         if(event.get_button() == 1){
             this.activate(event);
         }
         return true;
-    }
+    },
+
+    _buttonEnterEvent: function(){
+        this.actor.add_style_class_name('feedreader-feed-hover');
+    },
+
+    _buttonLeaveEvent: function() {
+        this.actor.remove_style_class_name('feedreader-feed-hover');
+    },
 };
