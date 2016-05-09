@@ -479,6 +479,11 @@ FeedApplet.prototype = {
             Mainloop.source_remove(this.timer_id);
             this.timer_id = 0;
         }
+
+        // Remove all notifications since they no longer apply
+        for (i in this.feeds){
+            this._destroyMessage(this.feeds[i].reader);
+        }
     },
 
     _ensureSource: function() {
@@ -488,7 +493,6 @@ FeedApplet.prototype = {
             let icon = new St.Icon({ gicon: gicon});
 
             this._source = new FeedMessageTraySource("RSS Feed Notification", icon);
-            //this._source = new FeedMessageTraySource();
             this._source.connect('destroy', Lang.bind(this, function(){
                 this._source = null;
             }));
@@ -496,28 +500,28 @@ FeedApplet.prototype = {
         }
     },
 
-    _notifyMessage: function(feed, title, text){
+    _notifyMessage: function(reader, title, text){
         this.logger.debug("FeedApplet._notifyMessage");
-        if(feed._notification)
-            feed._notification.destroy();
+        if(reader._notification)
+            reader._notification.destroy();
 
         this._ensureSource();
 
         let gicon = Gio.icon_new_for_string(this.path + "/icon.png");
         let icon = new St.Icon({ gicon: gicon});
-        feed._notification = new MessageTray.Notification(this._source, title, text, {icon: icon});
-        feed._notification.setTransient(false);
-        feed._notification.connect('destroy', function(){
-            feed._notification = null;
+        reader._notification = new MessageTray.Notification(this._source, title, text, {icon: icon});
+        reader._notification.setTransient(false);
+        reader._notification.connect('destroy', function(){
+            reader._notification = null;
         });
 
-        this._source.notify(feed._notification);
+        this._source.notify(reader._notification);
     },
 
-    _destroyMessage: function(feed){
+    _destroyMessage: function(reader){
         this.logger.debug("FeedApplet._destroyMessage");
-        if(feed._notification){
-            feed._notification.destroy();
+        if(reader._notification){
+            reader._notification.destroy();
         }
     },
 };
