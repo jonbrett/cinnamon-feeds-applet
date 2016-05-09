@@ -67,6 +67,7 @@ FeedApplet.prototype = {
 
         // Initialize the settings early so we can use them
         this.init_settings();
+        this.open_menu = null;
         try {
             debug_logging = this.settings.getValue("enable-verbose-logging");
 
@@ -363,6 +364,12 @@ FeedApplet.prototype = {
     toggle_feeds: function(feed_to_show) {
         this.logger.debug("FeedApplet.toggle_feeds");
 
+        // Close the open menu (in theory)
+        if(this.open_menu != null){
+            this.open_menu.close_menu();
+            this.open_menu = null;
+        }
+
         if (feed_to_show == null) {
             this.show_first_feed_with_items();
             return;
@@ -372,27 +379,20 @@ FeedApplet.prototype = {
 
         for (i in this.feeds) {
             if (this.feed_to_show == this.feeds[i]) {
-                this.feeds[i].menu.open(true);
-                this.feeds[i].actor.add_style_class_name('feedreader-feed-selected');
-            } else {
-                this.feeds[i].menu.close(true);
-                this.feeds[i].actor.remove_style_class_name('feedreader-feed-selected');
+                this.feeds[i].open_menu();
             }
         }
     },
 
+    // TODO: Merge these two functions
     show_first_feed_with_items: function(){
         this.logger.debug("FeedApplet.show_first_feed_with_items");
         let found = false;
 
         for (i in this.feeds) {
             if (!found && this.feeds[i].unread_count > 0) {
-                this.feeds[i].menu.open(true);
-                this.feeds[i].actor.add_style_class_name('feedreader-feed-selected');
+                this.feeds[i].open_menu();
                 found = true;
-            } else {
-                this.feeds[i].menu.close(true);
-                this.feeds[i].actor.remove_style_class_name('feedreader-feed-selected');
             }
         }
     },
@@ -543,8 +543,6 @@ FeedMessageTraySource.prototype = {
     }
 };
 
-
-
 /* Menu item for displaying the feed title*/
 function FeedDisplayMenuItem() {
     this._init.apply(this, arguments);
@@ -671,19 +669,7 @@ FeedDisplayMenuItem.prototype = {
         else
             this.actor.remove_style_class_name('feedreader-feed-new');
 
-        // If we are showing the action items then reshow them.
-        if(this.show_action_items && this.unread_count > 0){
-            this.show_action_items = false;
-            this.toggleMenu();
-            // Show this feed again.
-            this.owner.update();
-            this.owner.toggle_feeds(this);
-        } else {
-            this.show_action_items = false;
-            this.owner.update();
-            this.owner.toggle_feeds(null);
-        }
-
+        this.owner.update();
     },
 
     refresh: function() {
@@ -702,93 +688,57 @@ FeedDisplayMenuItem.prototype = {
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("FeedDisplayMenuItem Button Pressed Event: " + event.get_button());
 
-        if(event.get_button() == 1 || event.get_button() == 3){
-            // Right click, toggle the options menu
+        // right or left click show the feed
+        if(!this.open){
+            this.owner.toggle_feeds(this);
+        } else {
+            // if right click then open the raw feed in the browser.
             if(event.get_button() == 3){
-                this.toggleMenu();
+
             }
-
-            // click, toggle the menu if its not already open.
-            this.logger.debug(this.open);
-            this.open = true;
-            if (this.open)
-                this.owner.toggle_feeds(this);
-            else
-                this.owner.toggle_feeds(null);
-
-            this.actor.add_style_class_name('feedreader-feed-selected');
-            return true;
         }
-
-        return false;
     },
 
-    toggleMenu: function() {
-        this.logger.debug("toggle sub menu options.");
-
-        if(this.show_action_items){
-            // Remove the items.
-            let children = this.menu.box.get_children();
-            let cnt = this.menuItemCount;
-
-            for(let i = 0; i < cnt && i < children.length; i++) {
-                this.menu.box.remove_actor(children[i]);
-                this.menuItemCount--;
-            }
-            this.show_action_items = false;
-        } else {
-
+    open_menu: function() {
+        this.logger.debug("FeedDisplayMenuItem.open_menu");
+        //this.owner.toggle_feeds(this);
+        if(!this.open){
+            this.actor.add_style_class_name('feedreader-feed-selected');
+            this.menu.open(true);
+            this.open = true;
+            this.owner.open_menu = this;
             if(this.unread_count == 0)
                 return;
 
             // Add a new item to the top of the list.
             let menu_item;
 
-            this.logger.debug("" + this.reader.get_unread_count() + "  "  + this.max_items);
             if(this.reader.get_unread_count() > this.max_items){
                 // Only one page of items to read, no need to display mark all posts option.
                 menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
                 this.menu.addMenuItem(menu_item, 0);
-                this.menuItemCount = 1;
+                this.menuItemCount++;
             }
 
             let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
             menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
             this.menu.addMenuItem(menu_item, 0);
-            this.menuItemCount = this.menuItemCount + 1;
-
-            this.show_action_items = true;
+            this.menuItemCount++;
         }
     },
 
-    _show_sub_menu: function() {
+    close_menu: function() {
+        this.logger.debug("FeedDisplayMenuItem.close_menu");
 
-        if(this.unread_count == 0)
-            return;
-
-        // Add a new item to the top of the list.
-        let menu_item;
-
-        if(this.reader.get_unread_count() > this.max_items){
-            // Only one page of items to read, no need to display mark all posts option.
-            menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
-            this.menu.addMenuItem(menu_item, 0);
-            this.menuItemCount = 1;
-        }
-
-        let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
-        menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
-        this.menu.addMenuItem(menu_item, 0);
-        this.menuItemCount = this.menuItemCount + 1;
-    },
-
-    _hide_sub_menu: function() {
         let children = this.menu.box.get_children();
         let cnt = this.menuItemCount;
         for(let i = 0; i < cnt && i < children.length; i++){
             this.menu.box.remove_actor(children[i]);
-            this.menuItemCount = menuItemCount - 1;
+            this.menuItemCount--;
         }
+        this.actor.remove_style_class_name('feedreader-feed-selected');
+        this.menu.close(true);
+        this.open = false;
     },
 
     _buttonEnterEvent: function(){
@@ -997,6 +947,7 @@ ApplicationContextMenuItem.prototype = {
 
     activate: function(event){
         global.log(this._action);
+        //TODO: Need to roll this functionality up into the next level so they are easier to follow.
         switch(this._action){
             case "mark_all_read":
                 global.log("Marking all items read");
@@ -1004,6 +955,7 @@ ApplicationContextMenuItem.prototype = {
                     this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
+                    this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
@@ -1012,9 +964,13 @@ ApplicationContextMenuItem.prototype = {
             case "mark_next_read":
                 global.log("Marking next " + this._appButton.max_items + " items read");
                 try {
-                    this._appButton.menu.close();
+                    this._appButton.close_menu();
                     this._appButton.reader.mark_next_items_read(this._appButton.max_items);
                     this._appButton.update();
+                    if(this._appButton.unread_count > 0)
+                        this._appButton.open_menu();
+                    else
+                        this._appButton.owner.toggle_feeds();
                 } catch (e){
                     global.log("error: " + e);
                 }
