@@ -557,6 +557,7 @@ FeedDisplayMenuItem.prototype = {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
 
         //TODO: Add Box layout type to facilitate adding an icon?
+        this.menuItemCount = 0;
         this.show_action_items = false;
         this.open = false;
         this._title = new St.Label({ text: "loading",
@@ -725,29 +726,68 @@ FeedDisplayMenuItem.prototype = {
     toggleMenu: function() {
         this.logger.debug("toggle sub menu options.");
 
-        // Number of menu items added / removed
-        let menuItemCount = 2;
-
         if(this.show_action_items){
             // Remove the items.
             let children = this.menu.box.get_children();
+            let cnt = this.menuItemCount;
 
-            for(let i = 0; i < menuItemCount && i < children.length; i++)
+            for(let i = 0; i < cnt && i < children.length; i++) {
                 this.menu.box.remove_actor(children[i]);
+                this.menuItemCount--;
+            }
             this.show_action_items = false;
         } else {
 
+            if(this.unread_count == 0)
+                return;
+
             // Add a new item to the top of the list.
-            let menuitem;
+            let menu_item;
 
-            menuitem = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
+            this.logger.debug("" + this.reader.get_unread_count() + "  "  + this.max_items);
+            if(this.reader.get_unread_count() > this.max_items){
+                // Only one page of items to read, no need to display mark all posts option.
+                menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
+                this.menu.addMenuItem(menu_item, 0);
+                this.menuItemCount = 1;
+            }
 
-            this.menu.addMenuItem(menuitem, 0);
-
-            menuitem = new ApplicationContextMenuItem(this, _("Mark Next " + this.max_items + " Posts Read"), "mark_next_read");
-            this.menu.addMenuItem(menuitem, 0);
+            let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
+            menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
+            this.menu.addMenuItem(menu_item, 0);
+            this.menuItemCount = this.menuItemCount + 1;
 
             this.show_action_items = true;
+        }
+    },
+
+    _show_sub_menu: function() {
+
+        if(this.unread_count == 0)
+            return;
+
+        // Add a new item to the top of the list.
+        let menu_item;
+
+        if(this.reader.get_unread_count() > this.max_items){
+            // Only one page of items to read, no need to display mark all posts option.
+            menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
+            this.menu.addMenuItem(menu_item, 0);
+            this.menuItemCount = 1;
+        }
+
+        let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
+        menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
+        this.menu.addMenuItem(menu_item, 0);
+        this.menuItemCount = this.menuItemCount + 1;
+    },
+
+    _hide_sub_menu: function() {
+        let children = this.menu.box.get_children();
+        let cnt = this.menuItemCount;
+        for(let i = 0; i < cnt && i < children.length; i++){
+            this.menu.box.remove_actor(children[i]);
+            this.menuItemCount = menuItemCount - 1;
         }
     },
 
@@ -881,8 +921,9 @@ FeedMenuItem.prototype = {
             // Remove the items.
             let children = this.menu.box.get_children();
 
-            for(let i = 0; i < children.length; i++)
+            for(let i = 0; i < children.length; i++) {
                 this.menu.box.remove_actor(children[i]);
+            }
             this.show_action_items = false;
             this.logger.debug("Menu Item Count: " + this.menu.length);
         } else {
