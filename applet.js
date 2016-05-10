@@ -761,6 +761,7 @@ FeedMenuItem.prototype = {
 
     _init: function (parent, item, width, logger, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+        this._item_menu_count = 0;
         this.parent = parent;
         this.logger = logger;
         this.show_action_items = false;
@@ -838,6 +839,7 @@ FeedMenuItem.prototype = {
         if(event.get_button() == 3){
             this.logger.debug("Show Submenu");
             this.toggleMenu();
+            //this.open_menu();
             return true;
         }
         return false;
@@ -866,38 +868,35 @@ FeedMenuItem.prototype = {
         this.parent.owner.toggle_feeds(this.parent);
     },
 
-    toggleMenu: function() {
-        this.logger.debug("toggleMenu: " + this.show_action_items);
-        if(this.show_action_items){
-            // Remove the items.
-            let children = this.menu.box.get_children();
+    _open_menu: function() {
+        this.logger.debug("FeedItem.open_menu");
 
-            for(let i = 0; i < children.length; i++) {
-                this.menu.box.remove_actor(children[i]);
-            }
-            this.show_action_items = false;
-            this.logger.debug("Menu Item Count: " + this.menu.length);
-        } else {
-
-            try{
-                // Add a new item to the menu
-                let menuitem;
-
-                menuitem = new ApplicationContextMenuItem(this, _("Mark Post Read"), "mark_post_read");
-                this.menu.addMenuItem(menuitem);
-
-                // future support.
-                /*
-                menuitem = new ApplicationContextMenuItem(this, _("Delete Post"), "delete_post");
-                this.menu.addMenuItem(menuitem);
-                */
-                this.show_action_items = true;
-                this.logger.debug("Menu Item Count: " + this.menu.length);
-            } catch(e){
-                this.logger.error(e);
-            }
+        if(this._item_menu_count == 0) {
+            // No submenu item(s), add the item(s)
+            let menu_item;
+            menu_item = new ApplicationContextMenuItem(this, _("Mark Post Read"), "mark_post_read");
+            this.menu.addMenuItem(menu_item);
+            this._item_menu_count++;
         }
-        this.menu.toggle();
+
+        this.menu.open();
+    },
+
+    _close_menu: function() {
+        this.logger.debug("FeedItem.close_menu");
+        // no need to remove, just close the menu.
+
+        this.menu.close();
+    },
+
+    toggleMenu: function() {
+        this.logger.debug("toggleMenu");
+
+        if(!this.menu.isOpen){
+            this._open_menu();
+        } else {
+            this._close_menu();
+        }
     },
 
     calculate_age: function(published){
