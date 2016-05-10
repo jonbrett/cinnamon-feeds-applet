@@ -639,6 +639,7 @@ FeedDisplayMenuItem.prototype = {
     update: function() {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
+        this.menuItemCount = 0;
         this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
         let menu_items = 0;
         this.unread_count = 0;
@@ -656,7 +657,7 @@ FeedDisplayMenuItem.prototype = {
 
             menu_items++;
         }
-
+        this.logger.debug("Items Loaded: " + menu_items);
         this.logger.debug("Link: " + this.reader.url);
         let tooltipText = "Right Click For Feed Options: \n" + this.reader.url;
         let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
@@ -701,7 +702,7 @@ FeedDisplayMenuItem.prototype = {
 
     open_menu: function() {
         this.logger.debug("FeedDisplayMenuItem.open_menu");
-        //this.owner.toggle_feeds(this);
+
         if(!this.open){
             this.actor.add_style_class_name('feedreader-feed-selected');
             this.menu.open(true);
@@ -861,8 +862,8 @@ FeedMenuItem.prototype = {
         this.emit('item-read');
 
         // Check and toggle feeds if this is the last item.
-        if(this.parent.get_unread_count() == 0)
-            this.parent.owner.toggle_feeds();
+        //if(this.parent.get_unread_count() == 0)
+        this.parent.owner.toggle_feeds(this.parent);
     },
 
     toggleMenu: function() {
