@@ -671,6 +671,12 @@ FeedDisplayMenuItem.prototype = {
             this.actor.remove_style_class_name('feedreader-feed-new');
 
         this.owner.update();
+
+        // If this updates while the menu is open we need to refresh the menu.
+        if(this.open){
+            this.open = false;
+            this.open_menu();
+        }
     },
 
     refresh: function() {
