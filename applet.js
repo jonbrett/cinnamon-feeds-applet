@@ -659,7 +659,8 @@ FeedDisplayMenuItem.prototype = {
         }
         this.logger.debug("Items Loaded: " + menu_items);
         this.logger.debug("Link: " + this.reader.url);
-        let tooltipText = "Right Click For Feed Options: \n" + this.reader.url;
+        //TODO: change tooltip on open to read this, otherwise read last updated date?
+        let tooltipText = "Right Click to open feed: \n" + this.reader.url;
         let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
 
         /* Append unread_count to title */
@@ -701,7 +702,11 @@ FeedDisplayMenuItem.prototype = {
         } else {
             // if right click then open the raw feed in the browser.
             if(event.get_button() == 3){
-
+                try {
+                    Util.spawnCommandLine('xdg-open ' + this.reader.get_url());
+                } catch (e) {
+                    global.logError(e);
+                }
             }
         }
     },
