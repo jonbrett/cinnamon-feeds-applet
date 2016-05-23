@@ -254,6 +254,7 @@ FeedApplet.prototype = {
         for(var i = 0; i < url_list.length; i++) {
             this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
+                        feed_id: i,
                         logger: this.logger,
                         max_items: this.max_items,
                         show_read_items: this.show_read_items,
@@ -364,35 +365,36 @@ FeedApplet.prototype = {
     toggle_feeds: function(feed_to_show) {
         this.logger.debug("FeedApplet.toggle_feeds");
 
-        // Close the open menu (in theory)
+        // Check if a menu is already open
         if(this.open_menu != null){
+            // if matches requested feed and is not empty then exit, otherwise close the feed
+            if(feed_to_show != null && this.open_menu.feed_id == feed_to_show.feed_id && this.open_menu.unread_count > 0){
+                return;
+            }
+
+            // Close the last menu since we will be opening a new menu.
             this.open_menu.close_menu();
             this.open_menu = null;
         }
 
-        if (feed_to_show == null) {
-            this.show_first_feed_with_items();
-            return;
+        if(feed_to_show != null && feed_to_show.unread_count == 0){
+            //feed_to_show = null;
         }
 
-        this.feed_to_show = feed_to_show;
+        if (feed_to_show != null) {
+            // We know the feed to show, just open it.
+            this.feed_to_show = feed_to_show;
+            this.feed_to_show.open_menu();
+        } else {
+            let found = false;
 
-        for (i in this.feeds) {
-            if (this.feed_to_show == this.feeds[i]) {
-                this.feeds[i].open_menu();
-            }
-        }
-    },
-
-    // TODO: Merge these two functions
-    show_first_feed_with_items: function(){
-        this.logger.debug("FeedApplet.show_first_feed_with_items");
-        let found = false;
-
-        for (i in this.feeds) {
-            if (!found && this.feeds[i].unread_count > 0) {
-                this.feeds[i].open_menu();
-                found = true;
+            for (i in this.feeds) {
+                if (!found && this.feeds[i].unread_count > 0) {
+                    this.logger.debug("Opening Menu: " + this.feeds[i]);
+                    this.feeds[i].open_menu();
+                    found = true;
+                    break;
+                }
             }
         }
     },
@@ -554,10 +556,12 @@ FeedDisplayMenuItem.prototype = {
     _init: function (url, owner, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
 
+        //Used to keep track of unique feeds.
+        this.feed_id = params.feed_id;
+
         //TODO: Add Box layout type to facilitate adding an icon?
         this.menuItemCount = 0;
         this.show_action_items = false;
-        this.open = false;
         this._title = new St.Label({ text: "loading",
             style_class: 'feedreader-title-label'
         });
@@ -657,6 +661,10 @@ FeedDisplayMenuItem.prototype = {
 
             menu_items++;
         }
+
+        // Add the menu items and close the menu?
+        this._add_submenu();
+
         this.logger.debug("Items Loaded: " + menu_items);
         this.logger.debug("Link: " + this.reader.url);
         //TODO: change tooltip on open to read this, otherwise read last updated date?
@@ -672,12 +680,6 @@ FeedDisplayMenuItem.prototype = {
             this.actor.remove_style_class_name('feedreader-feed-new');
 
         this.owner.update();
-
-        // If this updates while the menu is open we need to refresh the menu.
-        if(this.open){
-            this.open = false;
-            this.open_menu();
-        }
     },
 
     refresh: function() {
@@ -696,61 +698,50 @@ FeedDisplayMenuItem.prototype = {
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("FeedDisplayMenuItem Button Pressed Event: " + event.get_button());
 
-        // right or left click show the feed
-        if(!this.open){
-            this.owner.toggle_feeds(this);
-        } else {
-            // if right click then open the raw feed in the browser.
-            if(event.get_button() == 3){
-                try {
-                    Util.spawnCommandLine('xdg-open ' + this.reader.get_url());
-                } catch (e) {
-                    global.logError(e);
-                }
+        if(event.get_button() == 3){
+            // Right click, open feed url
+            try {
+                Util.spawnCommandLine('xdg-open ' + this.reader.get_url());
+            } catch (e) {
+                global.logError(e);
             }
+        } else {
+            // Left click, show menu
+            this.owner.toggle_feeds(this);
         }
     },
 
     open_menu: function() {
         this.logger.debug("FeedDisplayMenuItem.open_menu");
 
-        if(!this.open){
-            this.actor.add_style_class_name('feedreader-feed-selected');
-            this.menu.open(true);
-            this.open = true;
-            this.owner.open_menu = this;
-            if(this.unread_count == 0)
-                return;
-
-            // Add a new item to the top of the list.
-            let menu_item;
-
-            if(this.reader.get_unread_count() > this.max_items){
-                // Only one page of items to read, no need to display mark all posts option.
-                menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
-                this.menu.addMenuItem(menu_item, 0);
-                this.menuItemCount++;
-            }
-
-            let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
-            menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
-            this.menu.addMenuItem(menu_item, 0);
-            this.menuItemCount++;
-        }
+        this.actor.add_style_class_name('feedreader-feed-selected');
+        this.menu.open(true);
+        this.owner.open_menu = this;
     },
 
     close_menu: function() {
         this.logger.debug("FeedDisplayMenuItem.close_menu");
-
-        let children = this.menu.box.get_children();
-        let cnt = this.menuItemCount;
-        for(let i = 0; i < cnt && i < children.length; i++){
-            this.menu.box.remove_actor(children[i]);
-            this.menuItemCount--;
-        }
         this.actor.remove_style_class_name('feedreader-feed-selected');
         this.menu.close(true);
-        this.open = false;
+    },
+
+    _add_submenu: function(){
+        // Add a new item to the top of the list.
+        let menu_item;
+
+        if(this.reader.get_unread_count() > this.max_items){
+            // Only one page of items to read, no need to display mark all posts option.
+            menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
+            this.menu.addMenuItem(menu_item, 0);
+            this.menuItemCount++;
+        }
+
+        let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
+        if(cnt > 0){
+            menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
+            this.menu.addMenuItem(menu_item, 0);
+            this.menuItemCount++;
+        }
     },
 
     _buttonEnterEvent: function(){
@@ -963,10 +954,11 @@ ApplicationContextMenuItem.prototype = {
             case "mark_all_read":
                 global.log("Marking all items read");
                 try {
-                    this._appButton.menu.close();
+                    //this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
-                    this._appButton.owner.toggle_feeds();
+                    // All items have been marked so we know we are opening a new feed menu.
+                    this._appButton.owner.toggle_feeds(null);
                 } catch (e){
                     global.log("error: " + e);
                 }
@@ -975,13 +967,15 @@ ApplicationContextMenuItem.prototype = {
             case "mark_next_read":
                 global.log("Marking next " + this._appButton.max_items + " items read");
                 try {
-                    this._appButton.close_menu();
+                    //this._appButton.close_menu();
                     this._appButton.reader.mark_next_items_read(this._appButton.max_items);
                     this._appButton.update();
-                    if(this._appButton.unread_count > 0)
-                        this._appButton.open_menu();
+
+                    // Since we have a shared method we need to check if we find the next open feed or not.
+                    if(this._appButton.owner.unread_count > 0)
+                        this._appButton.owner.toggle_feeds(this._appButton);
                     else
-                        this._appButton.owner.toggle_feeds();
+                        this._appButton.owner.toggle_feeds(null);
                 } catch (e){
                     global.log("error: " + e);
                 }
