@@ -362,8 +362,8 @@ FeedApplet.prototype = {
         }
     },
 
-    toggle_feeds: function(feed_to_show) {
-        this.logger.debug("FeedApplet.toggle_feeds");
+    toggle_feeds: function(feed_to_show, auto_next = false) {
+        this.logger.debug("FeedApplet.toggle_feeds auto:" + auto_next);
 
         // Check if a menu is already open
         if(this.open_menu != null){
@@ -377,8 +377,8 @@ FeedApplet.prototype = {
             this.open_menu = null;
         }
 
-        if(feed_to_show != null && feed_to_show.unread_count == 0){
-            //feed_to_show = null;
+        if(auto_next && feed_to_show != null && feed_to_show.unread_count == 0){
+            feed_to_show = null;
         }
 
         if (feed_to_show != null) {
@@ -396,6 +396,9 @@ FeedApplet.prototype = {
                     break;
                 }
             }
+            if(auto_next)
+                // Close the menu since this is the last feed
+                this.menu.close(true);
         }
     },
 
@@ -712,7 +715,7 @@ FeedDisplayMenuItem.prototype = {
     },
 
     open_menu: function() {
-        this.logger.debug("FeedDisplayMenuItem.open_menu");
+        this.logger.debug("FeedDisplayMenuItem.open_menu id:" + this.feed_id);
 
         this.actor.add_style_class_name('feedreader-feed-selected');
         this.menu.open(true);
@@ -720,7 +723,7 @@ FeedDisplayMenuItem.prototype = {
     },
 
     close_menu: function() {
-        this.logger.debug("FeedDisplayMenuItem.close_menu");
+        this.logger.debug("FeedDisplayMenuItem.close_menu id:" + this.feed_id);
         this.actor.remove_style_class_name('feedreader-feed-selected');
         this.menu.close(true);
     },
@@ -867,7 +870,7 @@ FeedMenuItem.prototype = {
 
         // Check and toggle feeds if this is the last item.
         //if(this.parent.get_unread_count() == 0)
-        this.parent.owner.toggle_feeds(this.parent);
+        this.parent.owner.toggle_feeds(this.parent, true);
     },
 
     _open_menu: function() {
@@ -970,12 +973,8 @@ ApplicationContextMenuItem.prototype = {
                     //this._appButton.close_menu();
                     this._appButton.reader.mark_next_items_read(this._appButton.max_items);
                     this._appButton.update();
+                    this._appButton.owner.toggle_feeds(this._appButton, true);
 
-                    // Since we have a shared method we need to check if we find the next open feed or not.
-                    if(this._appButton.owner.unread_count > 0)
-                        this._appButton.owner.toggle_feeds(this._appButton);
-                    else
-                        this._appButton.owner.toggle_feeds(null);
                 } catch (e){
                     global.log("error: " + e);
                 }
