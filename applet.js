@@ -386,16 +386,14 @@ FeedApplet.prototype = {
             this.feed_to_show = feed_to_show;
             this.feed_to_show.open_menu();
         } else {
-            let found = false;
-
             for (i in this.feeds) {
-                if (!found && this.feeds[i].unread_count > 0) {
+                if (this.feeds[i].unread_count > 0) {
                     this.logger.debug("Opening Menu: " + this.feeds[i]);
                     this.feeds[i].open_menu();
-                    found = true;
-                    break;
+                    return;
                 }
             }
+            // If we get here then no feeds are available, if this was the result of opening or marking the last feed read then close the menu.
             if(auto_next)
                 // Close the menu since this is the last feed
                 this.menu.close(true);
