@@ -1,3 +1,11 @@
+0.21
+====
+- Fixed issue with notifications remaining after app is removed. #68
+- Added new interface features. #85
+- * Added Highlighting, identifiying the selected feed.
+- * Added hover shading to better identify what feed / item is being hovered over.
+- Changed right click to open the raw feed in browser. #84
+- Made the sub menus automatic and smarter. #83
 0.20
 ====
 - Added color to unread feeds #81
