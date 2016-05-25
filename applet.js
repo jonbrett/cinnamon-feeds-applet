@@ -67,6 +67,7 @@ FeedApplet.prototype = {
 
         // Initialize the settings early so we can use them
         this.init_settings();
+        this.open_menu = null;
         try {
             debug_logging = this.settings.getValue("enable-verbose-logging");
 
@@ -253,6 +254,7 @@ FeedApplet.prototype = {
         for(var i = 0; i < url_list.length; i++) {
             this.feeds[i] = new FeedDisplayMenuItem(url_list[i].url, this,
                     {
+                        feed_id: i,
                         logger: this.logger,
                         max_items: this.max_items,
                         show_read_items: this.show_read_items,
@@ -360,36 +362,41 @@ FeedApplet.prototype = {
         }
     },
 
-    toggle_feeds: function(feed_to_show) {
-        this.logger.debug("FeedApplet.toggle_feeds");
+    toggle_feeds: function(feed_to_show, auto_next = false) {
+        this.logger.debug("FeedApplet.toggle_feeds auto:" + auto_next);
 
-        if (feed_to_show == null) {
-            this.show_first_feed_with_items();
-            return;
+        // Check if a menu is already open
+        if(this.open_menu != null){
+            // if matches requested feed and is not empty then exit, otherwise close the feed
+            if(feed_to_show != null && this.open_menu.feed_id == feed_to_show.feed_id && this.open_menu.unread_count > 0){
+                return;
+            }
+
+            // Close the last menu since we will be opening a new menu.
+            this.open_menu.close_menu();
+            this.open_menu = null;
         }
 
-        this.feed_to_show = feed_to_show;
-
-        for (i in this.feeds) {
-            if (this.feed_to_show == this.feeds[i]) {
-                this.feeds[i].menu.open(true);
-            } else {
-                this.feeds[i].menu.close(true);
-            }
+        if(auto_next && feed_to_show != null && feed_to_show.unread_count == 0){
+            feed_to_show = null;
         }
-    },
 
-    show_first_feed_with_items: function(){
-        this.logger.debug("FeedApplet.show_first_feed_with_items");
-        let found = false;
-
-        for (i in this.feeds) {
-            if (!found && this.feeds[i].unread_count > 0) {
-                this.feeds[i].menu.open(true);
-                found = true;
-            } else {
-                this.feeds[i].menu.close(true);
+        if (feed_to_show != null) {
+            // We know the feed to show, just open it.
+            this.feed_to_show = feed_to_show;
+            this.feed_to_show.open_menu();
+        } else {
+            for (i in this.feeds) {
+                if (this.feeds[i].unread_count > 0) {
+                    this.logger.debug("Opening Menu: " + this.feeds[i]);
+                    this.feeds[i].open_menu();
+                    return;
+                }
             }
+            // If we get here then no feeds are available, if this was the result of opening or marking the last feed read then close the menu.
+            if(auto_next)
+                // Close the menu since this is the last feed
+                this.menu.close(true);
         }
     },
 
@@ -475,6 +482,11 @@ FeedApplet.prototype = {
             Mainloop.source_remove(this.timer_id);
             this.timer_id = 0;
         }
+
+        // Remove all notifications since they no longer apply
+        for (i in this.feeds){
+            this._destroyMessage(this.feeds[i].reader);
+        }
     },
 
     _ensureSource: function() {
@@ -484,7 +496,6 @@ FeedApplet.prototype = {
             let icon = new St.Icon({ gicon: gicon});
 
             this._source = new FeedMessageTraySource("RSS Feed Notification", icon);
-            //this._source = new FeedMessageTraySource();
             this._source.connect('destroy', Lang.bind(this, function(){
                 this._source = null;
             }));
@@ -492,28 +503,28 @@ FeedApplet.prototype = {
         }
     },
 
-    _notifyMessage: function(feed, title, text){
+    _notifyMessage: function(reader, title, text){
         this.logger.debug("FeedApplet._notifyMessage");
-        if(feed._notification)
-            feed._notification.destroy();
+        if(reader._notification)
+            reader._notification.destroy();
 
         this._ensureSource();
 
         let gicon = Gio.icon_new_for_string(this.path + "/icon.png");
         let icon = new St.Icon({ gicon: gicon});
-        feed._notification = new MessageTray.Notification(this._source, title, text, {icon: icon});
-        feed._notification.setTransient(false);
-        feed._notification.connect('destroy', function(){
-            feed._notification = null;
+        reader._notification = new MessageTray.Notification(this._source, title, text, {icon: icon});
+        reader._notification.setTransient(false);
+        reader._notification.connect('destroy', function(){
+            reader._notification = null;
         });
 
-        this._source.notify(feed._notification);
+        this._source.notify(reader._notification);
     },
 
-    _destroyMessage: function(feed){
+    _destroyMessage: function(reader){
         this.logger.debug("FeedApplet._destroyMessage");
-        if(feed._notification){
-            feed._notification.destroy();
+        if(reader._notification){
+            reader._notification.destroy();
         }
     },
 };
@@ -535,8 +546,6 @@ FeedMessageTraySource.prototype = {
     }
 };
 
-
-
 /* Menu item for displaying the feed title*/
 function FeedDisplayMenuItem() {
     this._init.apply(this, arguments);
@@ -547,12 +556,17 @@ FeedDisplayMenuItem.prototype = {
 
     _init: function (url, owner, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+
+        //Used to keep track of unique feeds.
+        this.feed_id = params.feed_id;
+
+        //TODO: Add Box layout type to facilitate adding an icon?
+        this.menuItemCount = 0;
         this.show_action_items = false;
-        this.open = false;
         this._title = new St.Label({ text: "loading",
             style_class: 'feedreader-title-label'
         });
-        this.actor.set_style_class
+
         this.addActor(this._title, {expand: true, align: St.Align.START});
 
         this._triangleBin = new St.Bin({ x_align: St.Align.END });
@@ -605,7 +619,8 @@ FeedDisplayMenuItem.prototype = {
 
         // Force a load of items here
         this.refresh();
-
+        this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
+        this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
         Mainloop.idle_add(Lang.bind(this, this.update));
     },
 
@@ -629,6 +644,7 @@ FeedDisplayMenuItem.prototype = {
     update: function() {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
+        this.menuItemCount = 0;
         this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
         let menu_items = 0;
         this.unread_count = 0;
@@ -647,31 +663,24 @@ FeedDisplayMenuItem.prototype = {
             menu_items++;
         }
 
+        // Add the menu items and close the menu?
+        this._add_submenu();
+
+        this.logger.debug("Items Loaded: " + menu_items);
         this.logger.debug("Link: " + this.reader.url);
-        let tooltipText = "Right Click For Feed Options: \n" + this.reader.url;
+        //TODO: change tooltip on open to read this, otherwise read last updated date?
+        let tooltipText = "Right Click to open feed: \n" + this.reader.url;
         let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
 
         /* Append unread_count to title */
         this._title.set_text(this.get_title());
 
         if(this.unread_count > 0)
-            this.actor.style="color: orange;"
+            this.actor.add_style_class_name('feedreader-feed-new');
         else
-            this.actor.style=""
+            this.actor.remove_style_class_name('feedreader-feed-new');
 
-        // If we are showing the action items then reshow them.
-        if(this.show_action_items && this.unread_count > 0){
-            this.show_action_items = false;
-            this.toggleMenu();
-            // Show this feed again.
-            this.owner.update();
-            this.owner.toggle_feeds(this);
-        } else {
-            this.show_action_items = false;
-            this.owner.update();
-            this.owner.toggle_feeds(null);
-        }
-
+        this.owner.update();
     },
 
     refresh: function() {
@@ -690,52 +699,58 @@ FeedDisplayMenuItem.prototype = {
     _onButtonReleaseEvent: function (actor, event) {
         this.logger.debug("FeedDisplayMenuItem Button Pressed Event: " + event.get_button());
 
-        if(event.get_button() == 1 || event.get_button() == 3){
-            // Right click, toggle the options menu
-            if(event.get_button() == 3){
-                this.toggleMenu();
+        if(event.get_button() == 3){
+            // Right click, open feed url
+            try {
+                Util.spawnCommandLine('xdg-open ' + this.reader.get_url());
+            } catch (e) {
+                global.logError(e);
             }
-
-            // click, toggle the menu if its not already open.
-            this.logger.debug(this.open);
-            this.open = true;
-            if (this.open)
-                this.owner.toggle_feeds(this);
-            else
-                this.owner.toggle_feeds(null);
-
-            return true;
+        } else {
+            // Left click, show menu
+            this.owner.toggle_feeds(this);
         }
-
-        return false;
     },
 
-    toggleMenu: function() {
-        this.logger.debug("toggle sub menu options.");
+    open_menu: function() {
+        this.logger.debug("FeedDisplayMenuItem.open_menu id:" + this.feed_id);
 
-        // Number of menu items added / removed
-        let menuItemCount = 2;
+        this.actor.add_style_class_name('feedreader-feed-selected');
+        this.menu.open(true);
+        this.owner.open_menu = this;
+    },
 
-        if(this.show_action_items){
-            // Remove the items.
-            let children = this.menu.box.get_children();
+    close_menu: function() {
+        this.logger.debug("FeedDisplayMenuItem.close_menu id:" + this.feed_id);
+        this.actor.remove_style_class_name('feedreader-feed-selected');
+        this.menu.close(true);
+    },
 
-            for(let i = 0; i < menuItemCount && i < children.length; i++)
-                this.menu.box.remove_actor(children[i]);
-            this.show_action_items = false;
-        } else {
+    _add_submenu: function(){
+        // Add a new item to the top of the list.
+        let menu_item;
 
-            // Add a new item to the top of the list.
-            let menuitem;
-
-            menuitem = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
-            this.menu.addMenuItem(menuitem, 0);
-
-            menuitem = new ApplicationContextMenuItem(this, _("Mark Next " + this.max_items + " Posts Read"), "mark_next_read");
-            this.menu.addMenuItem(menuitem, 0);
-
-            this.show_action_items = true;
+        if(this.reader.get_unread_count() > this.max_items){
+            // Only one page of items to read, no need to display mark all posts option.
+            menu_item = new ApplicationContextMenuItem(this, _("Mark All Posts Read"), "mark_all_read");
+            this.menu.addMenuItem(menu_item, 0);
+            this.menuItemCount++;
         }
+
+        let cnt = (this.max_Items > this.unread_count) ? this.max_items : this.unread_count;
+        if(cnt > 0){
+            menu_item = new ApplicationContextMenuItem(this, _("Mark Next " + cnt + " Posts Read"), "mark_next_read");
+            this.menu.addMenuItem(menu_item, 0);
+            this.menuItemCount++;
+        }
+    },
+
+    _buttonEnterEvent: function(){
+        this.actor.add_style_class_name('feedreader-feed-hover');
+    },
+
+    _buttonLeaveEvent: function() {
+        this.actor.remove_style_class_name('feedreader-feed-hover');
     },
 };
 
@@ -749,6 +764,7 @@ FeedMenuItem.prototype = {
 
     _init: function (parent, item, width, logger, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
+        this._item_menu_count = 0;
         this.parent = parent;
         this.logger = logger;
         this.show_action_items = false;
@@ -811,6 +827,8 @@ FeedMenuItem.prototype = {
         this.connect('destroy', Lang.bind(this, function() {
             this.tooltip.destroy();
         }));
+        this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
+        this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
     },
 
     _onButtonReleaseEvent: function (actor, event) {
@@ -824,6 +842,7 @@ FeedMenuItem.prototype = {
         if(event.get_button() == 3){
             this.logger.debug("Show Submenu");
             this.toggleMenu();
+            //this.open_menu();
             return true;
         }
         return false;
@@ -848,41 +867,39 @@ FeedMenuItem.prototype = {
         this.emit('item-read');
 
         // Check and toggle feeds if this is the last item.
-        if(this.parent.get_unread_count() == 0)
-            this.parent.owner.toggle_feeds();
+        //if(this.parent.get_unread_count() == 0)
+        this.parent.owner.toggle_feeds(this.parent, true);
+    },
+
+    _open_menu: function() {
+        this.logger.debug("FeedItem.open_menu");
+
+        if(this._item_menu_count == 0) {
+            // No submenu item(s), add the item(s)
+            let menu_item;
+            menu_item = new ApplicationContextMenuItem(this, _("Mark Post Read"), "mark_post_read");
+            this.menu.addMenuItem(menu_item);
+            this._item_menu_count++;
+        }
+
+        this.menu.open();
+    },
+
+    _close_menu: function() {
+        this.logger.debug("FeedItem.close_menu");
+        // no need to remove, just close the menu.
+
+        this.menu.close();
     },
 
     toggleMenu: function() {
-        this.logger.debug("toggleMenu: " + this.show_action_items);
-        if(this.show_action_items){
-            // Remove the items.
-            let children = this.menu.box.get_children();
+        this.logger.debug("toggleMenu");
 
-            for(let i = 0; i < children.length; i++)
-                this.menu.box.remove_actor(children[i]);
-            this.show_action_items = false;
-            this.logger.debug("Menu Item Count: " + this.menu.length);
+        if(!this.menu.isOpen){
+            this._open_menu();
         } else {
-
-            try{
-                // Add a new item to the menu
-                let menuitem;
-
-                menuitem = new ApplicationContextMenuItem(this, _("Mark Post Read"), "mark_post_read");
-                this.menu.addMenuItem(menuitem);
-
-                // future support.
-                /*
-                menuitem = new ApplicationContextMenuItem(this, _("Delete Post"), "delete_post");
-                this.menu.addMenuItem(menuitem);
-                */
-                this.show_action_items = true;
-                this.logger.debug("Menu Item Count: " + this.menu.length);
-            } catch(e){
-                this.logger.error(e);
-            }
+            this._close_menu();
         }
-        this.menu.toggle();
     },
 
     calculate_age: function(published){
@@ -903,6 +920,14 @@ FeedMenuItem.prototype = {
             return '';
         }
     },
+
+    _buttonEnterEvent: function(){
+        this.actor.add_style_class_name('feedreader-feed-hover');
+    },
+
+    _buttonLeaveEvent: function() {
+        this.actor.remove_style_class_name('feedreader-feed-hover');
+    },
 };
 
 function ApplicationContextMenuItem(appButton, label, action){
@@ -913,23 +938,28 @@ ApplicationContextMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
     _init: function(appButton, label, action){
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {focusOnHover: false});
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
 
         this._appButton = appButton;
         this._action = action;
         this.label = new St.Label({ text: label });
         this.addActor(this.label);
+        this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
+        this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
     },
 
     activate: function(event){
         global.log(this._action);
+        //TODO: Need to roll this functionality up into the next level so they are easier to follow.
         switch(this._action){
             case "mark_all_read":
                 global.log("Marking all items read");
                 try {
-                    this._appButton.menu.close();
+                    //this._appButton.menu.close();
                     this._appButton.reader.mark_all_items_read();
                     this._appButton.update();
+                    // All items have been marked so we know we are opening a new feed menu.
+                    this._appButton.owner.toggle_feeds(null);
                 } catch (e){
                     global.log("error: " + e);
                 }
@@ -938,9 +968,11 @@ ApplicationContextMenuItem.prototype = {
             case "mark_next_read":
                 global.log("Marking next " + this._appButton.max_items + " items read");
                 try {
-                    this._appButton.menu.close();
+                    //this._appButton.close_menu();
                     this._appButton.reader.mark_next_items_read(this._appButton.max_items);
                     this._appButton.update();
+                    this._appButton.owner.toggle_feeds(this._appButton, true);
+
                 } catch (e){
                     global.log("error: " + e);
                 }
@@ -961,10 +993,19 @@ ApplicationContextMenuItem.prototype = {
                 break;
         }
     },
+
     _onButtonReleaseEvent: function (actor, event) {
         if(event.get_button() == 1){
             this.activate(event);
         }
         return true;
-    }
+    },
+
+    _buttonEnterEvent: function(){
+        this.actor.add_style_class_name('feedreader-feed-hover');
+    },
+
+    _buttonLeaveEvent: function() {
+        this.actor.remove_style_class_name('feedreader-feed-hover');
+    },
 };

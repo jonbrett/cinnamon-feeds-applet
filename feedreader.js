@@ -109,9 +109,14 @@ FeedReader.prototype = {
         this.load_items();
     },
 
+    get_url: function() {
+        return this.url;
+    },
+
     get: function() {
         this.logger.debug("FeedReader.get");
         Util.spawn_async(['python', APPLET_PATH+'/getFeed.py', this.url], Lang.bind(this, this.process_feed));
+
     },
     
     process_feed: function(response) {
