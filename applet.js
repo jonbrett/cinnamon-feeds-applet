@@ -68,6 +68,9 @@ FeedApplet.prototype = {
         // Initialize the settings early so we can use them
         this.init_settings();
         this.open_menu = null;
+        // Queue used to hold feeds that need to be processed
+        this.process_queue = [];
+
         try {
             debug_logging = this.settings.getValue("enable-verbose-logging");
 
@@ -157,6 +160,35 @@ FeedApplet.prototype = {
                 "url_list_str",
                 this.url_changed,
                 null);
+    },
+
+    _process_queue_add: function(item){
+        this.logger.debug("checking to add feed_id " + item.feed_id + " to the process queue.")
+        // Only add items once to the queue.
+
+        let found = this.process_queue.find(feed => (feed.feed_id == item.feed_id))
+
+        if(!found){
+            // push the item on the queue
+            this.process_queue.push(item);
+            this.logger.debug("Added feed to the process queue.")
+        }
+    },
+
+    process_queue_item: function() {
+        this.logger.debug("Processing the process queue, length: " + this.process_queue.length);
+
+        if(this.process_queue.length > 0){
+            this.logger.debug("b4 process queue length: " + this.process_queue.length);
+            let item = this.process_queue.shift();
+            //let item = this.process_queue[0];
+            //this.process_queue.splice(0, 1);
+            this.logger.debug("Item: " + item.feed_id);
+            this.logger.debug("after process queue length: " + this.process_queue.length);
+            item.refresh();
+        }
+
+
     },
 
     build_context_menu: function() {
@@ -320,10 +352,13 @@ FeedApplet.prototype = {
         }
         this.logger.debug("Updating all feed display items");
 
-        /* Update all feed display items */
         for (var i = 0; i < this.feeds.length; i++) {
-            this.feeds[i].refresh();
+            this.logger.debug("try 2 item: " + this.feeds[i].feed_id);
+            this._process_queue_add(this.feeds[i]);
         }
+
+        // Process the queue items.
+        this.process_queue_item();
 
         /* Convert refresh interval from mins -> ms */
         this.timeout = this.refresh_interval_mins * 60 * 1000;
@@ -393,7 +428,8 @@ FeedApplet.prototype = {
                     return;
                 }
             }
-            // If we get here then no feeds are available, if this was the result of opening or marking the last feed read then close the menu.
+            // If we get here then no feeds are available, if this was the result of opening or marking the
+            // last feed read then close the menu.
             if(auto_next)
                 // Close the menu since this is the last feed
                 this.menu.close(true);
@@ -605,6 +641,7 @@ FeedDisplayMenuItem.prototype = {
                     'onError' : Lang.bind(this, this.error),
                     'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification),
                     'onItemRead' : Lang.bind(this.owner, this.owner.item_read_notification),
+                    'onDownloaded' : Lang.bind(this.owner, this.owner.process_queue_item),
                 }
             );
 
@@ -645,7 +682,13 @@ FeedDisplayMenuItem.prototype = {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
         this.menuItemCount = 0;
-        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
+        let msg = "Finding first " +
+                  this.max_items +
+                  " unread items out of: " +
+                  this.reader.items.length +
+                  " total items";
+
+        this.logger.debug(msg);
         let menu_items = 0;
         this.unread_count = 0;
 
@@ -683,7 +726,7 @@ FeedDisplayMenuItem.prototype = {
         this.owner.update();
     },
 
-    refresh: function() {
+    refresh: function(callback) {
         this.logger.debug("FeedDisplayMenuItem.refresh");
         this.reader.get();
     },

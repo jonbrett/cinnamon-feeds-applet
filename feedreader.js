@@ -219,6 +219,13 @@ FeedReader.prototype = {
 
         let time =  new Date().getTime() - start;
 
+        // Notify to start the next item downloading.
+        try {
+            this.callbacks.onDownloaded();
+        } catch(e){
+            this.logger.debug(e)
+        }
+
         this.logger.debug("Processing Items took: " + time + " ms");
 
     },
