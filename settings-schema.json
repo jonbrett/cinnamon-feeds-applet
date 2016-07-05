@@ -26,7 +26,7 @@
     },
     "refresh_interval": {
         "type" : "spinbutton",
-        "default" : 5,
+        "default" : 15,
         "min" : 1,
         "max" : 60,
         "step" : 1,
@@ -36,7 +36,7 @@
     },
     "show_read_items": {
         "type" : "checkbox",
-        "default" : true,
+        "default" : false,
         "description" : "Show read items",
         "tooltip" : "Controls whether previously read items are displayed in the feed menu"
     },
