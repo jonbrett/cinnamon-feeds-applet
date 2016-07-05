@@ -645,8 +645,6 @@ FeedDisplayMenuItem.prototype = {
 
         this.reader.connect('items-loaded', Lang.bind(this, function()
         {
-            // TODO: params doesnt exist here
-            // Finish loading items here?
             this.logger.debug("items-loaded Event Fired for reader");
             // Title needs to be set on items-loaded event
             if(!this.custom_title)
@@ -657,14 +655,9 @@ FeedDisplayMenuItem.prototype = {
             this._title.set_text(this.rssTitle);
 
             this.title_length = (this._title.length > MIN_MENU_WIDTH) ? this._title.length : MIN_MENU_WIDTH;
-
-            // Force a load of items here
-            //TODO: Probably need to switch this to just queue this items feed, not all of them.
             this.owner.enqueue_feed(this);
             this.update();
             this.owner.process_next_feed();
-            // Dont start refreshing until items have been loaded.
-            //Mainloop.idle_add(Lang.bind(this, this.update));
         }));
 
         this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
