@@ -329,7 +329,10 @@ FeedReader.prototype = {
         }
     },
 
-    // Version 2 will load all items which have been saved to file.
+    /* This is the callback for the async file load and will
+        load the id, read, deleted status of each message. This is a limited amount of
+        data and thus without a network connection we will not get the title information.
+    */
     load_items: function(content) {
         this.logger.debug("FeedReader.load_items");
 
@@ -337,6 +340,7 @@ FeedReader.prototype = {
         {
             this.item_status = new Array();
             this.logger.debug("Number Loaded: 0");
+            this.title = _("Loading feed");
             this.emit('items-loaded');
             return;
         }

@@ -601,6 +601,7 @@ FeedDisplayMenuItem.prototype = {
 
         this.addActor(this._title, {expand: true, align: St.Align.START});
 
+
         this._triangleBin = new St.Bin({ x_align: St.Align.END });
         this.addActor(this._triangleBin, { expand: true,
                                            span: -1,
@@ -626,6 +627,7 @@ FeedDisplayMenuItem.prototype = {
         this.show_read_items = params.show_read_items;
         this.unread_count = 0;
         this.logger.debug("Loading FeedReader url: " + url);
+        this.custom_title = params.custom_title;
 
         /* Create reader */
         this.reader = new FeedReader.FeedReader(
@@ -643,13 +645,14 @@ FeedDisplayMenuItem.prototype = {
 
         this.reader.connect('items-loaded', Lang.bind(this, function()
         {
+            // TODO: params doesnt exist here
             // Finish loading items here?
             this.logger.debug("items-loaded Event Fired for reader");
             // Title needs to be set on items-loaded event
-            if(!params.custom_title)
+            if(!this.custom_title)
                 this.rssTitle = this.reader.title;
             else
-                this.rssTitle = params.custom_title;
+                this.rssTitle = this.custom_title;
 
             this._title.set_text(this.rssTitle);
 
@@ -658,9 +661,10 @@ FeedDisplayMenuItem.prototype = {
             // Force a load of items here
             //TODO: Probably need to switch this to just queue this items feed, not all of them.
             this.owner.enqueue_feed(this);
+            this.update();
             this.owner.process_next_feed();
             // Dont start refreshing until items have been loaded.
-            Mainloop.idle_add(Lang.bind(this, this.update));
+            //Mainloop.idle_add(Lang.bind(this, this.update));
         }));
 
         this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
