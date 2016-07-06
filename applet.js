@@ -185,9 +185,8 @@ FeedApplet.prototype = {
         if(this.feed_queue.length > 0){
             this.is_feed_downloading = true;
             let item = this.feed_queue.shift();
-            //TODO: Rename refresh to be more descriptive
-            // TODO: Is there a point to another method?
-            item.refresh();
+            // start the download of the feed
+            item.reader.get();
         }
     },
 
@@ -325,8 +324,6 @@ FeedApplet.prototype = {
                     show_read_items: this.show_read_items,
                     show_feed_image: this.show_feed_image
             });
-            //TODO: Should this be handled from the on_settings_changed function?
-            this.feeds[i].update();
         }
 
         logging_level = this.settings.getValue("enable-verbose-logging");
@@ -714,7 +711,7 @@ FeedDisplayMenuItem.prototype = {
 
         this.logger.debug("Items Loaded: " + menu_items);
         this.logger.debug("Link: " + this.reader.url);
-        //TODO: change tooltip on open to read this, otherwise read last updated date?
+
         let tooltipText = "Right Click to open feed: \n" + this.reader.url;
         let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
 
@@ -726,15 +723,7 @@ FeedDisplayMenuItem.prototype = {
         else
             this.actor.remove_style_class_name('feedreader-feed-new');
 
-        //TODO: Update this to an event?
         this.owner.update_title();
-    },
-
-    //TODO: What is callback for?
-    //refresh: function(callback) {
-    refresh: function() {
-        this.logger.debug("FeedDisplayMenuItem.refresh");
-        this.reader.get();
     },
 
     on_settings_changed: function(params) {
