@@ -1,11 +1,3 @@
-0.22
-====
-- Fixed processor 100% utilization issue. #91
-- Removed methods that caused app to be marked 'Dangerous' in cinnamon v3. #90
-- Above two fixed resolve cinnamon hanging at startup bug. #19
-- Resolved title being overridden sometimes and blank other times. #78
-- Changed default update interval to 15 min. #89
-- Changed default option to not show read posts. #88
 0.21
 ====
 - Fixed issue with notifications remaining after app is removed. #68
