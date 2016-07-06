@@ -116,8 +116,7 @@ FeedReader.prototype = {
         return this.url;
     },
 
-    //TODO: Rename this to be more descriptive
-    get: function() {
+    download_feed: function() {
         this.logger.debug("FeedReader.get");
         Util.spawn_async(['python', APPLET_PATH+'/getFeed.py', this.url], Lang.bind(this, this.process_feed));
 
@@ -202,10 +201,8 @@ FeedReader.prototype = {
                 this.items = new_items;
                 // Update the saved items so we can keep track of new and unread items.
                 this.save_items();
-                //TODO: Switch to be an event
                 this.callbacks.onUpdate();
 
-                //TODO: Switch to be an event
                 if(unread_items.length == 1) {
                     this.callbacks.onNewItem(this, this.title, unread_items[0].title);
                 } else if(unread_items.length > 1) {
@@ -222,6 +219,7 @@ FeedReader.prototype = {
             this.items = new_items;
             //TODO: Switch to be an event
             this.callbacks.onUpdate();
+            //this.emit('')
         }
 
         let time =  new Date().getTime() - start;

@@ -186,7 +186,7 @@ FeedApplet.prototype = {
             this.is_feed_downloading = true;
             let item = this.feed_queue.shift();
             // start the download of the feed
-            item.reader.get();
+            item.reader.download_feed();
         }
     },
 
