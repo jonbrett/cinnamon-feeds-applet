@@ -2,7 +2,7 @@
  * Cinnamon RSS feed reader applet
  *
  * Author: jonbrett.dev@gmail.com
- * Date: 2013
+ * Date: 2013 - 2016
  *
  * Cinnamon RSS feed reader applet is free software: you can redistribute it
  * and/or modify it under the terms of the GNU General Public License as published
@@ -47,6 +47,7 @@ const Clutter = imports.gi.Clutter;
 const Logger = imports.log_util;
 const MessageTray = imports.ui.messageTray;
 const Main = imports.ui.main;
+const Signals = imports.signals;
 
 /*  Application hook */
 function main(metadata, orientation, panel_height, instance_id) {
@@ -64,10 +65,12 @@ FeedApplet.prototype = {
 
     _init: function(metadata, orientation, panel_height, instance_id) {
         Applet.IconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
-
         // Initialize the settings early so we can use them
-        this.init_settings();
+        this._init_settings();
         this.open_menu = null;
+        // Queue used to hold feeds that need to be processed
+        this.feed_queue = [];
+
         try {
             debug_logging = this.settings.getValue("enable-verbose-logging");
 
@@ -92,7 +95,7 @@ FeedApplet.prototype = {
             this.menuManager.addMenu(this.menu);
 
             this.feed_file_error = false;
-            this.url_changed();
+            this._load_feeds();
         } catch (e) {
             // Just in-case the logger is the issue.
             if(this.logger != undefined){
@@ -101,66 +104,95 @@ FeedApplet.prototype = {
             global.logError(e);
         }
 
-        this.build_context_menu();
-        this.update();
+        this._build_context_menu();
+        // update is too soon
+        //this.update();
 
         this.timeout = this.refresh_interval_mins * 60 * 1000;
         this.logger.debug("Initial timeout set in: " + this.timeout + " ms");
         /* Set the next timeout */
         this.timer_id = Mainloop.timeout_add(this.timeout,
-                Lang.bind(this, this.refresh_tick));
+                Lang.bind(this, this._process_feeds));
 
         this.logger.debug("timer_id: " + this.timer_id);
     },
 
-    init_settings: function(instance_id) {
+    /* private function that connects to the settings-schema and initializes the variables */
+    _init_settings: function(instance_id) {
         this.settings = new Settings.AppletSettings(this, UUID, this.instance_id);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "refresh_interval",
                 "refresh_interval_mins",
-                this.on_settings_changed,
+                this._on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_read_items",
                 "show_read_items",
-                this.on_settings_changed,
+                this._on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "max_items",
                 "max_items",
-                this.on_settings_changed,
+                this._on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "show_feed_image",
                 "show_feed_image",
-                this.on_settings_changed,
+                this._on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "notifications_enabled",
                 "notifications_enabled",
-                this.on_settings_changed,
+                this._on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.IN,
                 "enable-verbose-logging",
                 "enable_verbose_logging",
-                this.on_settings_changed,
+                this._on_settings_changed,
                 null);
 
         this.settings.bindProperty(Settings.BindingDirection.BIDIRECTIONAL,
                 "url",
                 "url_list_str",
-                this.url_changed,
+                this._load_feeds,
                 null);
     },
 
-    build_context_menu: function() {
-        this.logger.debug("FeedApplet.build_context_menu");
+    /* Public method for adding a feed to be processed (downloaded) */
+    enqueue_feed: function(item){
+        this.logger.debug("checking to add feed_id " + item.feed_id + " to the process queue.")
+        // Only add items once to the queue.
+
+        let found = this.feed_queue.find(feed => (feed.feed_id == item.feed_id))
+
+        if(!found){
+            // push the item on the queue
+            this.feed_queue.push(item);
+            this.logger.debug("Added feed to the process queue.")
+        }
+    },
+
+    /* Public method to dequeue the next feed and process it (downloading and parsing). */
+    process_next_feed: function() {
+        // Need to limit this to a single execution
+        this.logger.debug("Processing the process queue, length: " + this.feed_queue.length);
+        if(this.feed_queue.length > 0){
+            this.is_feed_downloading = true;
+            let item = this.feed_queue.shift();
+            // start the download of the feed
+            item.reader.download_feed();
+        }
+    },
+
+    /* Private method to create the sub menu items for a feed. */
+    _build_context_menu: function() {
+        this.logger.debug("FeedApplet._build_context_menu");
         var s = new Applet.MenuItem(
                 _("Mark all read"),
                 "object-select-symbolic",
@@ -177,7 +209,7 @@ FeedApplet.prototype = {
                 "view-refresh-symbolic",
                 Lang.bind(this, function() {
                     this.logger.debug("view-refresh-symbolic calling refresh");
-                    this.refresh_tick();
+                    this._process_feeds();
                 }));
         this._applet_context_menu.addMenuItem(s);
 
@@ -202,10 +234,10 @@ FeedApplet.prototype = {
         }
     },
 
-    /* Converts a settings string into an array of objects, each containing a
+    /* Private method to Convert the settings string into an array of objects, each containing a
      * url and title property */
-    parse_feed_urls: function(str) {
-        this.logger.debug("FeedApplet.parse_feed_urls");
+    _parse_feed_urls: function(str) {
+        this.logger.debug("FeedApplet._parse_feed_urls");
         let lines = str.split("\n");
         let url_list = new Array();
 
@@ -237,17 +269,11 @@ FeedApplet.prototype = {
         return url_list;
     },
 
-    url_changed: function() {
-        this.logger.debug("FeedApplet.url_changed");
-        let url_list = this.parse_feed_urls(this.url_list_str);
-        this.on_feeds_changed(url_list);
-    },
-
-    // called when feeds have been added or removed
-    on_feeds_changed: function(url_list) {
-        this.logger.debug("FeedApplet.on_feeds_changed (url_list)");
+    /* Private method used to load / reload all the feeds. */
+    _load_feeds: function() {
+        this.logger.debug("FeedApplet._load_feeds");
         this.feeds = new Array();
-
+        let url_list = this._parse_feed_urls(this.url_list_str);
         this.menu.removeAll();
 
         // Feed Level Menu Items Added Here (each Feed includes posts).
@@ -266,11 +292,11 @@ FeedApplet.prototype = {
         }
     },
 
-    /* Called by Feed Display items to notify of changes to
+    /* public method to notify of changes to
      * feed info (e.g. unread count, title).  Updates the
      * applet icon and tooltip */
-    update: function() {
-        this.logger.debug("FeedApplet.update");
+    update_title: function() {
+        this.logger.debug("FeedApplet.update_title");
         let unread_count = 0;
         let tooltip = "";
 
@@ -289,15 +315,15 @@ FeedApplet.prototype = {
         this.set_applet_tooltip(tooltip);
     },
 
-    on_settings_changed: function() {
-        this.logger.debug("FeedApplet.on_settings_changed");
+    /* Private method used to handle updating feeds when a change has been made in the settings menu */
+    _on_settings_changed: function() {
+        this.logger.debug("FeedApplet._on_settings_changed");
         for (var i = 0; i < this.feeds.length; i++) {
             this.feeds[i].on_settings_changed({
                     max_items: this.max_items,
                     show_read_items: this.show_read_items,
                     show_feed_image: this.show_feed_image
             });
-            this.feeds[i].update();
         }
 
         logging_level = this.settings.getValue("enable-verbose-logging");
@@ -307,23 +333,25 @@ FeedApplet.prototype = {
             this.logger.verbose = logging_level;
         }
 
-        this.refresh_tick();
+        this._process_feeds();
     },
-    /* renamed to refresh_tick to prevent this from being called repeatedly by somewhere */
-    refresh_tick: function() {
-        this.logger.debug("FeedApplet.refresh_tick: Removing previous timer: " + this.timer_id);
+
+    /* Private method to initiate the downloading and refreshing of all feeds. */
+    _process_feeds: function() {
+        this.logger.debug("FeedApplet._process_feeds: Removing previous timer: " + this.timer_id);
 
         /* Remove any previous timeout */
         if (this.timer_id) {
             Mainloop.source_remove(this.timer_id);
             this.timer_id = 0;
         }
-        this.logger.debug("Updating all feed display items");
 
-        /* Update all feed display items */
         for (var i = 0; i < this.feeds.length; i++) {
-            this.feeds[i].refresh();
+            this.enqueue_feed(this.feeds[i]);
         }
+
+        // Process the queue items.
+        this.process_next_feed();
 
         /* Convert refresh interval from mins -> ms */
         this.timeout = this.refresh_interval_mins * 60 * 1000;
@@ -331,7 +359,7 @@ FeedApplet.prototype = {
         this.logger.debug("Setting next timeout to: " + this.timeout + " ms");
         /* Set the next timeout */
         this.timer_id = Mainloop.timeout_add(this.timeout,
-                Lang.bind(this, this.refresh_tick));
+                Lang.bind(this, this._process_feeds));
 
         this.logger.debug("timer_id: " + this.timer_id);
     },
@@ -393,7 +421,8 @@ FeedApplet.prototype = {
                     return;
                 }
             }
-            // If we get here then no feeds are available, if this was the result of opening or marking the last feed read then close the menu.
+            // If we get here then no feeds are available, if this was the result of opening or marking the
+            // last feed read then close the menu.
             if(auto_next)
                 // Close the menu since this is the last feed
                 this.menu.close(true);
@@ -409,7 +438,7 @@ FeedApplet.prototype = {
                     let read = stream.peek_buffer().toString();
                     if (read.length > 0) {
                         this.url_list_str = read;
-                        this.url_changed();
+                        this._load_feeds();
                     }
                 } catch(e) {
                     this.logger.error(e);
@@ -569,6 +598,7 @@ FeedDisplayMenuItem.prototype = {
 
         this.addActor(this._title, {expand: true, align: St.Align.START});
 
+
         this._triangleBin = new St.Bin({ x_align: St.Align.END });
         this.addActor(this._triangleBin, { expand: true,
                                            span: -1,
@@ -594,6 +624,7 @@ FeedDisplayMenuItem.prototype = {
         this.show_read_items = params.show_read_items;
         this.unread_count = 0;
         this.logger.debug("Loading FeedReader url: " + url);
+        this.custom_title = params.custom_title;
 
         /* Create reader */
         this.reader = new FeedReader.FeedReader(
@@ -605,23 +636,29 @@ FeedDisplayMenuItem.prototype = {
                     'onError' : Lang.bind(this, this.error),
                     'onNewItem' : Lang.bind(this.owner, this.owner.new_item_notification),
                     'onItemRead' : Lang.bind(this.owner, this.owner.item_read_notification),
+                    'onDownloaded' : Lang.bind(this.owner, this.owner.process_next_feed),
                 }
             );
 
-        if(!params.custom_title)
-            this.rssTitle = this.reader.title;
-        else
-            this.rssTitle = params.custom_title;
+        this.reader.connect('items-loaded', Lang.bind(this, function()
+        {
+            this.logger.debug("items-loaded Event Fired for reader");
+            // Title needs to be set on items-loaded event
+            if(!this.custom_title)
+                this.rssTitle = this.reader.title;
+            else
+                this.rssTitle = this.custom_title;
 
-        this._title.set_text(this.rssTitle);
+            this._title.set_text(this.rssTitle);
 
-        this.title_length = (this._title.length > MIN_MENU_WIDTH) ? this._title.length : MIN_MENU_WIDTH;
+            this.title_length = (this._title.length > MIN_MENU_WIDTH) ? this._title.length : MIN_MENU_WIDTH;
+            this.owner.enqueue_feed(this);
+            this.update();
+            this.owner.process_next_feed();
+        }));
 
-        // Force a load of items here
-        this.refresh();
         this.actor.connect('enter-event', Lang.bind(this, this._buttonEnterEvent));
         this.actor.connect('leave-event', Lang.bind(this, this._buttonLeaveEvent));
-        Mainloop.idle_add(Lang.bind(this, this.update));
     },
 
     get_title: function() {
@@ -645,7 +682,13 @@ FeedDisplayMenuItem.prototype = {
         this.logger.debug("FeedDisplayMenuItem.update");
         this.menu.removeAll();
         this.menuItemCount = 0;
-        this.logger.debug("Finding first " + this.max_items + " unread items out of: " + this.reader.items.length + " total items");
+        let msg = "Finding first " +
+                  this.max_items +
+                  " unread items out of: " +
+                  this.reader.items.length +
+                  " total items";
+
+        this.logger.debug(msg);
         let menu_items = 0;
         this.unread_count = 0;
 
@@ -668,7 +711,7 @@ FeedDisplayMenuItem.prototype = {
 
         this.logger.debug("Items Loaded: " + menu_items);
         this.logger.debug("Link: " + this.reader.url);
-        //TODO: change tooltip on open to read this, otherwise read last updated date?
+
         let tooltipText = "Right Click to open feed: \n" + this.reader.url;
         let tooltip = new Tooltips.Tooltip(this.actor, tooltipText);
 
@@ -680,12 +723,7 @@ FeedDisplayMenuItem.prototype = {
         else
             this.actor.remove_style_class_name('feedreader-feed-new');
 
-        this.owner.update();
-    },
-
-    refresh: function() {
-        this.logger.debug("FeedDisplayMenuItem.refresh");
-        this.reader.get();
+        this.owner.update_title();
     },
 
     on_settings_changed: function(params) {
@@ -753,7 +791,7 @@ FeedDisplayMenuItem.prototype = {
         this.actor.remove_style_class_name('feedreader-feed-hover');
     },
 };
-
+Signals.addSignalMethods(FeedDisplayMenuItem.prototype);
 /* Menu item for displaying an feed item */
 function FeedMenuItem() {
     this._init.apply(this, arguments);
@@ -930,17 +968,17 @@ FeedMenuItem.prototype = {
     },
 };
 
-function ApplicationContextMenuItem(appButton, label, action){
-    this._init(appButton, label, action);
+function ApplicationContextMenuItem(feed_display_menu_item, label, action){
+    this._init(feed_display_menu_item, label, action);
 }
 
 ApplicationContextMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function(appButton, label, action){
+    _init: function(feed_display_menu_item, label, action){
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {hover: false});
 
-        this._appButton = appButton;
+        this._fdmi = feed_display_menu_item;
         this._action = action;
         this.label = new St.Label({ text: label });
         this.addActor(this.label);
@@ -950,28 +988,27 @@ ApplicationContextMenuItem.prototype = {
 
     activate: function(event){
         global.log(this._action);
-        //TODO: Need to roll this functionality up into the next level so they are easier to follow.
         switch(this._action){
             case "mark_all_read":
                 global.log("Marking all items read");
                 try {
                     //this._appButton.menu.close();
-                    this._appButton.reader.mark_all_items_read();
-                    this._appButton.update();
+                    this._fdmi.reader.mark_all_items_read();
+                    this._fdmi.update();
                     // All items have been marked so we know we are opening a new feed menu.
-                    this._appButton.owner.toggle_feeds(null);
+                    this._fdmi.owner.toggle_feeds(null);
                 } catch (e){
                     global.log("error: " + e);
                 }
 
                 break;
             case "mark_next_read":
-                global.log("Marking next " + this._appButton.max_items + " items read");
+                global.log("Marking next " + this._fdmi.max_items + " items read");
                 try {
                     //this._appButton.close_menu();
-                    this._appButton.reader.mark_next_items_read(this._appButton.max_items);
-                    this._appButton.update();
-                    this._appButton.owner.toggle_feeds(this._appButton, true);
+                    this._fdmi.reader.mark_next_items_read(this._fdmi.max_items);
+                    this._fdmi.update();
+                    this._fdmi.owner.toggle_feeds(this._fdmi, true);
 
                 } catch (e){
                     global.log("error: " + e);
@@ -985,7 +1022,7 @@ ApplicationContextMenuItem.prototype = {
                 break;
             case "mark_post_read":
                 global.log("Marking item 'read'");
-                this._appButton.mark_read();
+                this._fdmi.mark_read();
                 break;
 
             case "delete_post":

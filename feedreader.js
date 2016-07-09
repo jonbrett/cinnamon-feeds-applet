@@ -2,7 +2,7 @@
  * Cinnamon RSS feed reader (backend)
  *
  * Author: jonbrett.dev@gmail.com
- * Date: 2013
+ * Date: 2013 - 2016
  *
  * Cinnamon RSS feed reader is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published by
@@ -105,15 +105,18 @@ FeedReader.prototype = {
             throw "Failed to create HTTP session: " + e;
         }
 
+        let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
+        // Let the python script grab the items and load them using an async method
+        Util.spawn_async(['python', APPLET_PATH+'/loadItems.py', path], Lang.bind(this, this.load_items));
         /* Load items */
-        this.load_items();
+        //this.load_items();
     },
 
     get_url: function() {
         return this.url;
     },
 
-    get: function() {
+    download_feed: function() {
         this.logger.debug("FeedReader.get");
         Util.spawn_async(['python', APPLET_PATH+'/getFeed.py', this.url], Lang.bind(this, this.process_feed));
 
@@ -214,10 +217,20 @@ FeedReader.prototype = {
         // Make items available even on the first load.
         if (this.items.length == 0 && new_items.length > 0){
             this.items = new_items;
+            //TODO: Switch to be an event
             this.callbacks.onUpdate();
+            //this.emit('')
         }
 
         let time =  new Date().getTime() - start;
+
+        // Notify to start the next item downloading.
+        try {
+            //TODO: Switch to be an event
+            this.callbacks.onDownloaded();
+        } catch(e){
+            this.logger.debug(e)
+        }
 
         this.logger.debug("Processing Items took: " + time + " ms");
 
@@ -229,6 +242,7 @@ FeedReader.prototype = {
         for (var i = 0; i < this.items.length; i++)
             this.items[i].mark_read(false);
 
+        //TODO: Switch to be an event
         this.callbacks.onItemRead(this);
         this.save_items();
     },
@@ -247,12 +261,14 @@ FeedReader.prototype = {
             if (marked == number)
                 break;
         }
+        //TODO: Switch to be an event
         this.callbacks.onItemRead(this);
         this.save_items();
     },
 
     on_item_read: function() {
         this.logger.debug("FeedReader.on_item_read");
+        //TODO: Switch to be an event
         this.callbacks.onItemRead(this);
         this.save_items();
     },
@@ -311,21 +327,23 @@ FeedReader.prototype = {
         }
     },
 
-    // Version 2 will load all items which have been saved to file.
-    load_items: function() {
+    /* This is the callback for the async file load and will
+        load the id, read, deleted status of each message. This is a limited amount of
+        data and thus without a network connection we will not get the title information.
+    */
+    load_items: function(content) {
         this.logger.debug("FeedReader.load_items");
-        try {
-            let path = Gio.file_parse_name(this.path + '/' + sanitize_url(this.url)).get_path();
-            //var content = Cinnamon.get_file_contents_utf8_sync(path);
-            var content = Cinnamon.get_file_contents_utf8_sync(path);
-        } catch (e) {
-            /* This is fine for new feeds */
-            this.logger.debug("No file found - Assuming new feed.")
+
+        if(content == '')
+        {
+            this.item_status = new Array();
+            this.logger.debug("Number Loaded: 0");
+            this.title = _("Loading feed");
+            this.emit('items-loaded');
             return;
         }
-
         try {
-            this.logger.debug("Loading already fetched feed items");
+            //this.logger.debug("Loading already fetched feed items");
             var data = JSON.parse(unescape(content));
 
             if (typeof data == "object") {
@@ -341,6 +359,7 @@ FeedReader.prototype = {
                     this.item_status = new Array();
 
                 this.logger.debug("Number Loaded: " + this.item_status.length);
+                this.emit('items-loaded');
             } else {
                 global.logError('Invalid data file for ' + this.url);
             }
@@ -384,7 +403,7 @@ FeedReader.prototype = {
         this.error = true;
         this.error_messsage = msg;
         this.error_details = details;
-
+        //TODO: Switch to be an event
         if (this.callbacks.onError)
             this.callbacks.onError(this, msg, details);
 
@@ -445,6 +464,7 @@ FeedReader.prototype = {
         return ret;
     },
 };
+Signals.addSignalMethods(FeedReader.prototype);
 
 function sanitize_url(url) {
     return url.replace(/.*:\/\//, '').replace(/\//g,'--');
