@@ -1,3 +1,6 @@
+0.23
+ ====
+ - opml file import will fail with non-ascii characters in title. #94
 0.22
  ====
  - Fixed processor 100% utilization issue. #91
