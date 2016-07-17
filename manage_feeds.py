@@ -320,12 +320,18 @@ class MainWindow(Gtk.Window):
             tree = et.parse(filename)
             root = tree.getroot()
             for outline in root.findall(".//outline[@type='rss']"):
+                url = outline.attrib.get('xmlUrl', '').decode('utf-8')
+                # for now just ignore feed title decoding issues.
+                try:
+                    title = outline.attrib.get('text', '').decode('utf-8').encode('ascii', 'ignore')
+                except:
+                    title = ""
                 new_feeds.append([
-                        outline.attrib.get('xmlUrl', '').decode('utf-8'),
-                        outline.attrib.get('text', '').decode('utf-8').encode('ascii', 'ignore'),
-                        False])
+                    url,
+                    title,
+                    False])
         except Exception as e:
-            dialog = Gtk.MessageDialog(self, 0,
+            dialog = Gtk.MessagseDialog(self, 0,
                                        Gtk.MessageType.ERROR,
                                        Gtk.ButtonsType.CANCEL,
                                        "Failed to import OPML")
